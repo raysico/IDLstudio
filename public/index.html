@@ -18,7 +18,9 @@
     <button id="projBtn" class="btn" title="新建项目（清空当前数据，回到 Node 示例）">新建项目</button>
     <button id="addResourceBtn" class="btn" title="新增一个资源">＋ 资源</button>
     <button id="addModelBtn" class="btn" title="新增一个模型">＋ 模型</button>
-    <button id="importBtn" class="btn" title="导入 OpenAPI yaml/json 续写">导入</button>
+    <button id="importIdlBtn" class="btn" title="导入 IDL yaml/json 文件还原项目">导入 IDL</button>
+    <input type="file" id="importIdlInput" accept=".yaml,.yml,.json" hidden>
+    <button id="importBtn" class="btn" title="导入 OpenAPI yaml/json 续写">导入OpenAPI</button>
     <button id="saveBtn" class="btn primary" title="保存 IDL 项目到本地 project.json">保存</button>
     <button id="loadBtn" class="btn" title="从本地 project.json 载入">载入</button>
     <span id="saveStatus" class="buf-status"></span>
@@ -59,8 +61,6 @@
         <div class="toolbar-actions">
           <span id="sourceStatus" class="buf-status"></span>
           <button id="exportBtn" class="btn" title="导出项目 IDL + 备注到文件，可在其他设备导入继续编辑">导出项目</button>
-          <button id="importIdlBtn" class="btn" title="导入 IDL yaml/json 文件还原项目">导入 IDL</button>
-          <input type="file" id="importIdlInput" accept=".yaml,.yml,.json" hidden>
         </div>
       </div>
       <textarea id="sourceInput" spellcheck="false"></textarea>
