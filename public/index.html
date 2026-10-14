@@ -50,6 +50,7 @@
       <button class="tab-btn" data-tab="openapi">OpenAPI</button>
       <button class="tab-btn" data-tab="proto">proto</button>
       <button class="tab-btn" data-tab="debug">调试台</button>
+      <button class="tab-btn" data-tab="log">日志</button>
     </div>
     <div class="tab-panel" id="panel-source">
       <div class="panel-toolbar">
@@ -74,6 +75,13 @@
     </div>
     <div class="tab-panel" id="panel-debug" hidden>
       <div id="debugForm"></div>
+    </div>
+    <div class="tab-panel" id="panel-log" hidden>
+      <div class="panel-toolbar">
+        <span class="hist-hint">导入错误报告与丢失记录（本地持久化，最多 200 条）</span>
+        <button id="logClear" class="btn">清空</button>
+      </div>
+      <div id="logView"></div>
     </div>
   </aside>
 </main>

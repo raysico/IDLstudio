@@ -883,6 +883,7 @@ function initTabs() {
       document.querySelectorAll('.tab-panel').forEach((p) => { p.hidden = p.id !== 'panel-' + b.dataset.tab; });
       if (activeTab === 'debug') renderDebug();
       if (activeTab === 'source') refreshDerived();
+      if (activeTab === 'log') renderLog();
     };
   });
   $('copyOpenapi').onclick = () => copyText($('openapiView').textContent, 'OpenAPI 已复制');
@@ -913,6 +914,34 @@ async function loadProject() {
   } catch (e) { saveStatus('载入失败'); }
 }
 
+// ---------- 日志（导入错误报告 / 丢失记录，localStorage 持久化，上限 200） ----------
+let logs = null;
+function loadLogs() {
+  try { const v = localStorage.getItem('idlstudio_log'); if (!v) return []; const a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+}
+function persistLogs() {
+  try { localStorage.setItem('idlstudio_log', JSON.stringify(logs.slice(0, 200))); } catch (e) {}
+}
+function addLog(type, title, lines) {
+  if (!logs) logs = [];
+  logs.unshift({ ts: new Date().toISOString(), type, title, lines: (lines || []).slice(0, 50) });
+  logs = logs.slice(0, 200);
+  persistLogs();
+  if (activeTab === 'log') renderLog();
+}
+function renderLog() {
+  const el = $('logView'); if (!el) return;
+  if (!logs || !logs.length) { el.innerHTML = '<div class="placeholder">暂无日志。导入 OpenAPI 产生的错误报告与丢失记录会显示在这里。</div>'; return; }
+  const badge = { info: '导入', warn: '丢失', error: '错误' };
+  el.innerHTML = logs.map((e) => {
+    const time = new Date(e.ts).toLocaleTimeString('zh-CN', { hour12: false });
+    const body = (e.lines && e.lines.length) ? '<ul>' + e.lines.map((l) => '<li>' + esc(l) + '</li>').join('') + '</ul>' : '';
+    return '<div class="log-entry log-' + (e.type || 'info') + '">' +
+      '<div class="log-head"><span class="log-time">' + esc(time) + '</span><span class="log-badge">' + esc(badge[e.type] || e.type) + '</span><span class="log-title">' + esc(e.title || '') + '</span></div>' + body +
+      '</div>';
+  }).join('');
+}
+
 // ---------- 导入 OpenAPI ----------
 function openImport() {
   $('impText').value = '';
@@ -939,8 +968,11 @@ function doImport() {
     renderForm();
     showImpWarn(res.warnings);
     saveStatus('已导入 ' + p.resources.length + ' 资源 / ' + p.models.length + ' 模型');
+    addLog('info', '导入成功：' + (p.name || '') + ' v' + (p.version || ''), ['资源 ' + p.resources.length + ' · 模型 ' + p.models.length + ' · 方法 ' + p.resources.reduce((a, r) => a + r.methods.length, 0)]);
+    if (res.warnings && res.warnings.length) addLog('warn', '导入丢失记录（' + res.warnings.length + ' 条）', res.warnings);
   } catch (e) {
     $('impWarn').innerHTML = '<div class="imp-warn-title">导入失败：</div><ul><li>' + esc(e.message) + '</li></ul>';
+    addLog('error', '导入失败', [e.message]);
   }
 }
 
@@ -966,6 +998,9 @@ async function init() {
     if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); saveProject(); }
   });
   initTheme(); initResizer(); initTabs();
+  logs = loadLogs();
+  renderLog();
+  $('logClear').onclick = () => { logs = []; persistLogs(); renderLog(); };
   try {
     const d = await fetch('/api/project').then((r) => r.json());
     project = (d && d.ok && d.project) ? d.project : defaultProject();

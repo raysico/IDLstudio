@@ -219,3 +219,15 @@ body.dark ::-webkit-scrollbar-thumb:hover { background: #4a5365; border: 2px sol
 .adv { border: 1px dashed var(--line); border-radius: 8px; padding: 10px 12px; margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
 
 .modal-overlay[hidden] { display: none !important; }
+
+/* —— 日志面板 —— */
+#logView { overflow: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
+.log-entry { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+.log-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.log-time { color: var(--muted); font-size: 11px; flex: 0 0 auto; }
+.log-badge { padding: 1px 7px; border-radius: 10px; font-size: 11px; flex: 0 0 auto; }
+.log-info .log-badge { background: rgba(47,158,68,.15); color: #2f9e44; }
+.log-warn .log-badge { background: rgba(232,89,12,.16); color: #e8590c; }
+.log-error .log-badge { background: rgba(224,49,49,.16); color: #e03131; }
+.log-title { font-weight: 700; }
+.log-entry ul { margin: 6px 0 0 18px; padding: 0; color: var(--muted); }
