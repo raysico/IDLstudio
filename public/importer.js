@@ -24,6 +24,23 @@
     const f = newField({ name });
     if (!schema || typeof schema !== 'object') return f;
     if (schema.$ref) { f.type = 'ref'; f.ref = refName(schema.$ref); if (schema.description) f.desc = schema.description; return f; }
+    // oneOf -> 合成 oneof 模型：每个选项一个字段，同组归 oneof
+    if (Array.isArray(schema.oneOf) && schema.oneOf.length) {
+      const synName = ((ctxName ? pascal(ctxName) : '') + pascal(name)) || ('Union' + pascal(name));
+      let syn = models.find((m) => m.name === synName);
+      if (!syn) {
+        syn = newModel({ name: synName, desc: schema.description || '' });
+        schema.oneOf.forEach((opt, i) => {
+          const optTitle = (opt && (opt.title || opt.description)) ? pascal(opt.title || opt.description) : ('option' + (i + 1));
+          const optF = schemaToField(optTitle, opt, synName, models, warnings);
+          optF.oneof = 'choice';
+          syn.fields.push(optF);
+        });
+        models.push(syn);
+      }
+      f.type = 'ref'; f.ref = synName;
+      return f;
+    }
     const t = schema.type;
     if (schema.format === 'date-time' || schema.format === 'date') { f.type = 'timestamp'; }
     else if (t === 'integer') f.type = 'int';
@@ -114,7 +131,7 @@
         if (!resByKey[resName]) { resByKey[resName] = { id: uid(), name: resName, desc: '', methods: [] }; resources.push(resByKey[resName]); }
         const r = resByKey[resName];
         const mName = op.operationId ? pascal(op.operationId) : pascal(verb + ' ' + resName);
-        const m = { id: uid(), name: mName, http: verb.toUpperCase() + ' ' + path, desc: op.summary || '', note: op['x-note'] || op.description || '', example: '', input: [], output: { kind: 'void', ref: '', fields: [] }, errors: [] };
+        const m = { id: uid(), name: mName, http: verb.toUpperCase() + ' ' + path, desc: op.summary || '', note: op['x-note'] || op.description || '', example: '', input: [], output: { kind: 'void', ref: '', fields: [] }, errors: [], stream: (op['x-streaming'] && ['server', 'client', 'bidi'].includes(op['x-streaming'])) ? op['x-streaming'] : 'none' };
         // parameters
         const params = op.parameters || [];
         for (const p of params) {

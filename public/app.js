@@ -26,10 +26,10 @@ let dark = false;
 
 // ---------- 内部模型 ----------
 function newField(o) {
-  return Object.assign({ id: uid(), name: '', type: 'string', required: false, in: 'body', desc: '', enum: [], itemsType: 'string', itemsRef: '', ref: '', mapValueType: 'string', mapValueRef: '', tag: 0 }, o || {});
+  return Object.assign({ id: uid(), name: '', type: 'string', required: false, in: 'body', desc: '', enum: [], itemsType: 'string', itemsRef: '', ref: '', mapValueType: 'string', mapValueRef: '', tag: 0, oneof: '' }, o || {});
 }
 function newMethod(o) {
-  return Object.assign({ id: uid(), name: '', http: '', desc: '', note: '', example: '', input: [], output: { kind: 'void', ref: '', fields: [] }, errors: [] }, o || {});
+  return Object.assign({ id: uid(), name: '', http: '', desc: '', note: '', example: '', input: [], output: { kind: 'void', ref: '', fields: [] }, errors: [], stream: 'none' }, o || {});
 }
 function newResource(o) {
   return Object.assign({ id: uid(), name: '', desc: '', methods: [] }, o || {});
@@ -87,6 +87,7 @@ function fieldToYaml(f) {
   if (f.required) o.required = true;
   if (f.desc) o.desc = f.desc;
   if (f.tag > 0) o.tag = f.tag;
+  if (f.oneof) o.oneof = f.oneof;
   if (f.type === 'enum' && f.enum && f.enum.length) o.enum = f.enum;
   if (f.type === 'array') {
     o.items = f.itemsType === 'ref' ? { type: 'ref', ref: f.itemsRef } : f.itemsType;
@@ -121,6 +122,7 @@ function toYamlSource() {
       if (m.desc) mo.description = m.desc;
       if (m.note) mo.note = m.note;
       if (m.example) mo.example = m.example;
+      if (m.stream && m.stream !== 'none') mo.stream = m.stream;
       const inp = fieldsToYamlMap(m.input);
       if (Object.keys(inp).length) mo.input = inp;
       const out = outputToYaml(m.output);
@@ -153,6 +155,7 @@ function yamlToField(name, raw) {
   if (raw.required) f.required = true;
   if (raw.desc) f.desc = String(raw.desc);
   if (raw.tag) f.tag = Number(raw.tag) || 0;
+  if (raw.oneof) f.oneof = String(raw.oneof);
   if (Array.isArray(raw.enum)) f.enum = raw.enum.map(String);
   if (f.type === 'array') {
     if (typeof raw.items === 'string') { f.itemsType = raw.items; f.itemsRef = ''; }
@@ -173,7 +176,7 @@ function parseYamlToProject(root) {
     const r = newResource({ name: rname, desc: (ro && ro.description) || '' });
     const methods = (ro && ro.methods) || {};
     for (const [mname, mo] of Object.entries(methods)) {
-      const m = newMethod({ name: mname, http: (mo && mo.http) || '', desc: (mo && mo.description) || '', note: (mo && mo.note != null) ? String(mo.note) : '', example: (mo && mo.example != null) ? String(mo.example) : '' });
+      const m = newMethod({ name: mname, http: (mo && mo.http) || '', desc: (mo && mo.description) || '', note: (mo && mo.note != null) ? String(mo.note) : '', example: (mo && mo.example != null) ? String(mo.example) : '', stream: (mo && mo.stream) || 'none' });
       const inp = (mo && mo.input) || {};
       for (const [fname, fraw] of Object.entries(inp)) m.input.push(yamlToField(fname, fraw));
       const out = (mo && mo.output);
@@ -256,14 +259,24 @@ function fieldSchema(f) {
   }
 }
 function objFromFields(fields) {
-  const props = {}, required = [];
+  const props = {}, required = [], groups = {};
   for (const f of fields) {
     if (!f.name) continue;
+    if (f.oneof) { (groups[f.oneof] = groups[f.oneof] || []).push(f); continue; }
     props[f.name] = Object.assign({}, fieldSchema(f), f.desc ? { description: f.desc } : {});
     if (f.required) required.push(f.name);
   }
   const o = { type: 'object', properties: props };
   if (required.length) o.required = required;
+  const oneOf = [];
+  for (const gname of Object.keys(groups)) {
+    for (const f of groups[gname]) {
+      const sub = { required: [f.name], properties: {} };
+      sub.properties[f.name] = Object.assign({}, fieldSchema(f), f.desc ? { description: f.desc } : {});
+      oneOf.push(sub);
+    }
+  }
+  if (oneOf.length) o.oneOf = oneOf;
   return o;
 }
 function modelToOAS(m) { return objFromFields(m.fields); }
@@ -297,6 +310,7 @@ function toOpenAPI() {
       }
       const op = { operationId: r.name + m.name, tags: [r.name], description: m.desc || undefined, parameters: parameters.length ? parameters : undefined };
       if (m.note) op['x-note'] = m.note;
+      if (m.stream && m.stream !== 'none') op['x-streaming'] = m.stream;
       if (bodyFields.length) op.requestBody = { content: { 'application/json': { schema: objFromFields(bodyFields) } } };
       const outSchema = outputToOAS(m.output);
       const respContent = outSchema ? { 'application/json': { schema: outSchema } } : undefined;
@@ -359,12 +373,22 @@ function messageText(name, fields, reserved) {
   const lines = ['message ' + name + ' {'];
   const used = new Set();
   const resvNums = (reserved && reserved.numbers) || [];
-  for (const f of fields) {
-    if (!f.name) continue;
+  const groups = {};
+  const emitField = (f, indent) => {
     let n = (f.tag > 0) ? f.tag : 0;
     if (n <= 0) { do { n++; } while (used.has(n) || resvNums.includes(n)); }
     used.add(n);
-    lines.push('  ' + protoType(f, name) + ' ' + snake(f.name) + ' = ' + n + ';');
+    lines.push(indent + protoType(f, name) + ' ' + snake(f.name) + ' = ' + n + ';');
+  };
+  for (const f of fields) {
+    if (!f.name) continue;
+    if (f.oneof) { (groups[f.oneof] = groups[f.oneof] || []).push(f); continue; }
+    emitField(f, '  ');
+  }
+  for (const gname of Object.keys(groups)) {
+    lines.push('  oneof ' + snake(gname) + ' {');
+    for (const f of groups[gname]) emitField(f, '    ');
+    lines.push('  }');
   }
   if (reserved && reserved.names && reserved.names.length) lines.push('  reserved ' + reserved.names.map((x) => '"' + x + '"').join(', ') + ';');
   if (resvNums.length) lines.push('  reserved ' + fmtReservedNumbers(resvNums) + ';');
@@ -412,7 +436,9 @@ function toProto() {
       else if (m.output.kind === 'inline') respName = pascal(r.name) + ctx + 'Response';
       else { respName = 'google.protobuf.Empty'; usesEmpty = true; }
       if (m.note) svc.push('  // ' + String(m.note).split('\n').join('\n  // '));
-      svc.push('  rpc ' + ctx + '(' + reqName + ') returns (' + respName + ');');
+      const streamIn = (m.stream === 'client' || m.stream === 'bidi') ? 'stream ' : '';
+      const streamOut = (m.stream === 'server' || m.stream === 'bidi') ? 'stream ' : '';
+      svc.push('  rpc ' + ctx + '(' + streamIn + reqName + ') returns (' + streamOut + respName + ');');
       chunks.push(messageText(reqName, m.input));
       for (const f of m.input) if (f.type === 'timestamp') usesTs = true;
       if (m.output.kind === 'inline') {
@@ -538,6 +564,7 @@ function renderForm() {
       '<label class="fld"><span>方法名</span><input id="mName" value="' + esc(m.name) + '" placeholder="Create"></label>' +
       '<label class="fld"><span>路由（留空用标准方法默认）</span><input id="mHttp" value="' + esc(m.http) + '" placeholder="POST /nodes"></label>' +
       '<label class="fld sm"><span>当前</span><input value="' + esc(route.verb + ' ' + route.path) + '" readonly></label>' +
+      '<label class="fld sm"><span>流类型</span><select id="mStream"><option value="none">none</option><option value="server">server</option><option value="client">client</option><option value="bidi">bidi</option></select></label>' +
       '</div>' +
       '<label class="fld grow"><span>描述</span><input id="mDesc" value="' + esc(m.desc) + '" placeholder="描述"></label>' +
       '<label class="fld grow"><span>备注说明</span><textarea id="mNote" class="code" rows="2" placeholder="写该方法的备注、注意事项、调用说明等（仅文档用途，不影响生成契约）">' + esc(m.note) + '</textarea></label>' +
@@ -553,6 +580,8 @@ function renderForm() {
       '<div class="actions"><button class="btn danger" id="delMethod">删除方法</button></div>';
     bindText('mName', (v) => { m.name = v; refreshDerived(); });
     bindText('mHttp', (v) => { m.http = v; refreshDerived(); });
+    const mStream = $('mStream'); mStream.value = m.stream || 'none';
+    mStream.onchange = () => { m.stream = mStream.value; refreshDerived(); };
     bindText('mDesc', (v) => { m.desc = v; refreshDerived(); });
     bindText('mNote', (v) => { m.note = v; refreshDerived(); });
     bindText('mExample', (v) => { m.example = v; refreshDerived(); });
@@ -612,6 +641,7 @@ function fieldRow(f, ctx) {
     '<label class="fld"><input type="checkbox" class="freq" checked> <span>必填</span></label>' +
     '<span class="fmeta"></span>' +
     '<input class="ftag fld xs" title="proto 字段编号（tag，留空自动）" placeholder="tag" value="' + esc(f.tag || '') + '">' +
+    '<input class="foneof fld sm" title="oneof 组名（同组字段归一个互斥组，proto 生成 oneof 块）" placeholder="oneof组" value="' + esc(f.oneof || '') + '">' +
     '<span class="mact del">✕</span>';
   row.querySelector('.ftype').value = f.type;
   if (f.in && ['path', 'query', 'header'].includes(f.in)) row.querySelector('.floc').value = f.in;
@@ -622,6 +652,7 @@ function fieldRow(f, ctx) {
   row.querySelector('.floc').onchange = (e) => { f.in = e.target.value; refreshDerived(); };
   freq.onchange = () => { f.required = freq.checked; refreshDerived(); };
   row.querySelector('.ftag').oninput = (e) => { f.tag = parseInt(e.target.value, 10) || 0; refreshDerived(); };
+  row.querySelector('.foneof').oninput = (e) => { f.oneof = e.target.value.trim(); refreshDerived(); };
   row.querySelector('.del').onclick = (e) => { e.stopPropagation(); removeField(f, ctx); };
   // 类型相关附加控件
   const meta = row.querySelector('.fmeta');
