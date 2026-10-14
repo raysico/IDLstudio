@@ -69,7 +69,7 @@ function defaultProject() {
   ], output: { kind: 'void', ref: '', fields: [] }, errors: [404] });
 
   return {
-    name: 'MyService', version: '1.0.0', imports: [],
+    name: 'MyService', version: '1.0.0', description: '', imports: [],
     resources: [newResource({ name: 'Node', desc: '节点资源', methods: [create, get, list, update, del] })],
     models: [node],
   };
@@ -109,6 +109,7 @@ function toYamlSource() {
   const root = {};
   root.name = project.name || 'MyService';
   root.version = project.version || '1.0.0';
+  if (project.description) root.description = project.description;
   if (project.imports && project.imports.length) root.imports = project.imports;
   const res = {};
   for (const r of project.resources) {
@@ -165,7 +166,7 @@ function yamlToField(name, raw) {
   return f;
 }
 function parseYamlToProject(root) {
-  const p = { name: String(root.name || 'MyService'), version: String(root.version || '1.0.0'), imports: Array.isArray(root.imports) ? root.imports.map(String) : [], resources: [], models: [] };
+  const p = { name: String(root.name || 'MyService'), version: String(root.version || '1.0.0'), description: String(root.description || ''), imports: Array.isArray(root.imports) ? root.imports.map(String) : [], resources: [], models: [] };
   const res = root.resources || {};
   for (const [rname, ro] of Object.entries(res)) {
     if (!rname) continue;
@@ -306,7 +307,9 @@ function toOpenAPI() {
       paths[route.path][route.verb.toLowerCase()] = op;
     }
   }
-  return { openapi: '3.1.0', info: { title: project.name || 'MyService', version: project.version || '1.0.0' }, paths, components: { schemas } };
+  const info = { title: project.name || 'MyService', version: project.version || '1.0.0' };
+  if (project.description) info.description = project.description;
+  return { openapi: '3.1.0', info, paths, components: { schemas } };
 }
 
 // ---------- protobuf / gRPC 生成 ----------
@@ -479,6 +482,7 @@ function select(kind, id) {
 function renderForm() {
   const head = $('formHead'), body = $('formBody');
   head.innerHTML = ''; body.innerHTML = '';
+  if ($('projBtn')) $('projBtn').classList.toggle('active', !sel.kind);
   let title = '', tag = '', desc = '';
   if (sel.kind === 'resource') {
     const r = findRes(sel.id); if (!r) return;
@@ -586,10 +590,12 @@ function renderForm() {
   body.innerHTML =
     '<label class="fld grow"><span>服务名</span><input id="projName" value="' + esc(project.name || '') + '" placeholder="MyService"></label>' +
     '<label class="fld grow"><span>版本</span><input id="projVersion" value="' + esc(project.version || '') + '" placeholder="1.0.0"></label>' +
+    '<label class="fld grow"><span>描述</span><textarea id="projDesc" class="code" rows="2" placeholder="服务简介">' + esc(project.description || '') + '</textarea></label>' +
     '<label class="fld grow"><span>proto imports（每行一个，如 google/protobuf/timestamp.proto）</span><textarea id="projImports" class="code" rows="2" placeholder="google/protobuf/timestamp.proto">' + esc((project.imports || []).join('\n')) + '</textarea></label>' +
     '<div class="group-label">在左侧选择资源 / 方法 / 模型开始设计</div>';
   bindText('projName', (v) => { project.name = v; refreshDerived(); });
   bindText('projVersion', (v) => { project.version = v; refreshDerived(); });
+  bindText('projDesc', (v) => { project.description = v; refreshDerived(); });
   $('projImports').addEventListener('input', (e) => { project.imports = e.target.value.split(/\n/).map((s) => s.trim()).filter(Boolean); refreshDerived(); });
 }
 function bindText(id, fn) {

@@ -189,7 +189,7 @@
       }
     }
     const name = pascal((api && api.info && api.info.title) || 'MyService');
-    return { name: name || 'MyService', version: (api && api.info && api.info.version) || '1.0.0', resources, models, imports: [] };
+    return { name: name || 'MyService', version: (api && api.info && api.info.version) || '1.0.0', description: (api && api.info && api.info.description) || '', resources, models, imports: [] };
   }
 
   function parseOpenApiText(text) {
