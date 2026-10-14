@@ -598,7 +598,7 @@ function renderForm() {
     bindText('resName', (v) => { r.name = v; refreshDerived(); });
     bindText('resDesc', (v) => { r.desc = v; refreshDerived(); });
     // methods
-    body.innerHTML = '<div class="group-label">方法</div><div class="mlist" id="mlist"></div><div class="actions"><button class="btn" id="addMethod">＋ 方法</button><button class="btn danger" id="delRes">删除资源</button></div>';
+    body.innerHTML = '<div class="group-label">方法</div><div class="mlist" id="mlist"></div><div class="actions"><button class="btn" id="addMethod">＋ 方法<span class="keyhint">' + keycapHint('E') + '</span></button><button class="btn danger" id="delRes">删除资源</button></div>';
     const ml = $('mlist');
     for (const m of r.methods) {
       const row = document.createElement('div'); row.className = 'mitem';
@@ -618,7 +618,7 @@ function renderForm() {
     head.innerHTML = '<span class="kind-tag">' + tag + '</span><span class="ftitle">' + esc(title) + '</span><input class="fld grow" id="mName" value="' + esc(m.name) + '" placeholder="模型名"><input class="fld grow" id="mDesc" value="' + esc(m.desc) + '" placeholder="描述">';
     bindText('mName', (v) => { m.name = v; refreshDerived(); });
     bindText('mDesc', (v) => { m.desc = v; refreshDerived(); });
-    body.innerHTML = '<div class="group-label">字段</div><div id="flds"></div><div class="actions"><button class="btn" id="addFld">＋ 字段</button><button class="btn danger" id="delModel">删除模型</button></div>' +
+    body.innerHTML = '<div class="group-label">字段</div><div id="flds"></div><div class="actions"><button class="btn" id="addFld">＋ 字段<span class="keyhint">' + keycapHint('F') + '</span></button><button class="btn danger" id="delModel">删除模型</button></div>' +
       '<div class="group-label adv-toggle" id="advToggle">高级(proto)属性 ▸</div>' +
       '<div class="adv" id="advBody" hidden>' +
       '<label class="fld grow"><span>reserved 编号（逗号分隔，proto 线兼容保护）</span><input id="resNumbers" value="' + esc((m.reserved.numbers || []).join(',')) + '" placeholder="2, 15, 9 to 11"></label>' +
