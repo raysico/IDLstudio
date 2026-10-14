@@ -824,11 +824,23 @@ let debugSel = null;
 function renderDebug() {
   const el = $('debugForm');
   const methods = collectMethods();
-  const opts = methods.map(({ r, m }) => '<option value="' + r.id + '.' + m.id + '"' + (debugSel === r.id + '.' + m.id ? ' selected' : '') + '>' + esc(r.name + '.' + m.name + '  (' + resolveRoute(m, r.name).verb + ' ' + resolveRoute(m, r.name).path + ')') + '</option>').join('');
+  const items = methods.map(({ r, m }) => ({
+    key: r.id + '.' + m.id,
+    label: r.name + '.' + m.name + '  (' + resolveRoute(m, r.name).verb + ' ' + resolveRoute(m, r.name).path + ')'
+  }));
+  const selItem = items.find((i) => i.key === debugSel);
+  const opts = items.map((i) => '<option value="' + esc(i.label) + '"></option>').join('');
   el.innerHTML =
-    '<div class="debug-head"><select id="dbgMethod"><option value="">(选择一个方法)</option>' + opts + '</select></div>' +
+    '<div class="debug-head"><input id="dbgMethod" list="dbgMethodList" placeholder="输入方法名匹配…" value="' + (selItem ? esc(selItem.label) : '') + '">' +
+    '<datalist id="dbgMethodList">' + opts + '</datalist></div>' +
     '<div id="dbgBody"></div>';
-  $('dbgMethod').onchange = () => { debugSel = $('dbgMethod').value || null; renderDebugForm(); };
+  const inp = $('dbgMethod');
+  inp.addEventListener('change', () => {
+    const v = inp.value.trim();
+    const hit = v ? (items.find((i) => i.label === v || i.key === v) || null) : null;
+    debugSel = hit ? hit.key : null;
+    renderDebugForm();
+  });
   if (debugSel) renderDebugForm();
 }
 function findMethodByKey(key) {
@@ -1115,6 +1127,15 @@ function newGuard(fn) {
   if (activeTab === 'debug') { saveStatus('当前为调试台模式，请切回编辑标签后操作'); return; }
   fn();
 }
+// 顶栏「＋资源 / ＋模型」旁的快捷键键帽提示（平台自适应：mac=⌘，win=⌃）
+function kcap(g) { return '<kbd class="kc">' + g + '</kbd>'; }
+function renderKeyHints() {
+  const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || '');
+  const M = isMac ? '⌘' : '⌃'; // Cmd(mac) / Ctrl(win)
+  const S = '⇧';
+  const h = $('resHint'); if (h) h.innerHTML = kcap(M) + kcap(S) + kcap('R');
+  const m = $('modelHint'); if (m) m.innerHTML = kcap(M) + kcap(S) + kcap('M');
+}
 function addFieldShortcut() {
   if (activeTab === 'debug') { saveStatus('当前为调试台模式，请切回编辑标签后操作'); return; }
   if (!sel || sel.kind !== 'model' || !findModel(sel.id)) { saveStatus('未选中模型'); return; }
@@ -1190,6 +1211,7 @@ async function init() {
     if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) saveProject();
   });
   bindShortcuts();
+  renderKeyHints();
   initTheme(); initResizer(); initTabs();
   logs = loadLogs();
   renderLog();
