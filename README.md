@@ -64,4 +64,4 @@ IDLstudio/
 
 ## 许可证
 
-[MIT](LICENSE) © 2026 何小点点 (hoxiudimdim)
+[MIT](LICENSE) © 2026 何小点点 (raysico)
