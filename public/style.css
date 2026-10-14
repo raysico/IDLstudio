@@ -145,7 +145,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 /* 调试台 */
 #debugForm { flex: 1; overflow-y: auto; padding: 8px 2px; display: flex; flex-direction: column; gap: 10px; }
 .debug-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.debug-head select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; flex: 1; background: var(--card); color: var(--text); }
+.debug-head select, #dbgMethod { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; flex: 1; min-width: 0; background: var(--card); color: var(--text); }
 .resp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .status { font-weight: 700; font-size: 18px; }
 .meta { color: var(--muted); font-size: 12px; }
