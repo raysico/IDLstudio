@@ -121,9 +121,67 @@ IDLstudio/
 
 ## 8. 限制与后续
 - 当前覆盖：资源 + 标准方法 + 常见类型 + 单层错误码；**流式（server/client/bidi stream）、oneof、嵌套 map 的复杂表达、权限 scope、版本化策略**暂不在 v0.1
-- 后续可选：proto → OpenAPI 反向生成、.proto 导入、多文件工程、代码生成（客户端 stubs）
+- 后续可选：外部契约导入与无损往返见 §9；另可选 `.proto` 多文件工程、代码生成（客户端 stubs）
 
-## 9. 验收
+## 9. 导入与无损往返（规划）
+
+目标：支持导入 **OpenAPI yaml/json** 与 **.proto** 到 IDL 模型后继续表单编辑（续写），并保证 **proto → IDL → proto 无损往返**。
+
+### 9.1 策略：IDL 超集化
+不再在反向映射时丢弃 proto 特性，而是把 IDL 模型升级为「**proto 完整可表达 + OpenAPI 合理子集**」的中立超集：
+- **结构化属性**：语义清晰、高频的 proto 概念建模成字段/属性，生成器按规则发射。
+- **原样保留袋（extras）**：低频/杂项（各类 `option`、自定义选项）以 key→value 结构化存下，导出时原样回写。
+
+### 9.2 反向映射（导入）
+**OpenAPI → IDL**
+
+| OpenAPI | → IDL |
+|---|---|
+| `paths.<path>.<verb>` | 资源（按 tag/路径段分组）+ 方法 |
+| `parameters(in: path/query/header)` | 字段 `in` |
+| `requestBody(application/json object)` | body 字段 |
+| `responses.200.schema` | `output`（`$ref`→模型引用；内联→内联对象） |
+| `components.schemas` | `models` |
+| `description` / `x-note` | `desc` / `note` |
+| `example` | `example` |
+
+**proto → IDL**
+
+| proto | → IDL |
+|---|---|
+| `message` | `model` |
+| 字段：`int64/int32/uint32…→int`、`double→number`、`string→string`、`bool→bool`、`Timestamp→timestamp`、`repeated→array`、`map→map`、`enum→enum`、消息引用→`ref` | `field` |
+| `enum`（首个 `_UNSPECIFIED=0`） | `enum` |
+| `service` + `rpc <名>(Req) returns (Resp)` | 资源（按 service）+ 方法；`Req/Resp` → `input/output` |
+| 注释 `//` | `desc` / `note` |
+
+### 9.3 无损属性（结构化建模 proto 语义）
+全部可选、有默认，旧 `project.json` 不受影响：
+
+| 属性 | 归属 | 说明 |
+|---|---|---|
+| `tag: N` | 字段 | proto 字段编号；导入记录、生成发射；新增字段分配 max+1 并避开 reserved |
+| `oneof: 组名` | 字段 | 同模型内同组字段归一个 oneof；proto 生成 `oneof 组{...}`，OpenAPI 映射 `oneOf` |
+| `stream: none\|server\|client\|bidi` | 方法 | proto 生成 `stream Xxx`；OpenAPI 用 `x-streaming` 标注 |
+| `imports: [ ... ]` | 项目 | proto import；自动维护 timestamp，其余原样保留 |
+| `reserved: { numbers, names }` | 模型 | 发射 `reserved 2,15,9 to 11;` / `reserved "a","b";` |
+| `options: { key: value }` | 项目/消息/字段/方法 | 兜底袋，导出原样回写 |
+
+### 9.4 方向性说明
+- **proto 方向**：完全无损（含 9.3 全部属性）。
+- **OpenAPI 方向**：wire 编号、reserved、部分 option 无法表达 → IDL 保留、OpenAPI 输出忽略；oneof→`oneOf`、stream→`x-streaming`。
+
+### 9.5 表单与实现落点
+- 每个模型/方法/字段增加「**高级(proto)属性**」可折叠区，默认收起。
+- 新增 `public/importers.js`（`openApiToModel` / `protoToModel` / `parseIdlYaml`）；`app.js` 接入导入流程与名称冲突处理；`index.html` 加入口；`server.js` 不动。
+- **无损验收标准**：导入 proto → 导出 → 再导入 → **逐字节一致**（golden round-trip）。
+
+### 9.6 分期
+1. **阶段一**：`tag` + `imports` + `reserved`（线兼容关键，改动小）
+2. **阶段二**：`oneof` + `stream`
+3. **阶段三**：`options` 兜底袋
+
+## 10. 验收
 - 通过表单或源码新增/修改一个资源与字段 → OpenAPI 与 proto 实时变化
 - 导出/复制生成的 OpenAPI 可被 tana/anytype 调试客户端加载
 - 调试台发送返回可读的示例响应，查找可高亮
