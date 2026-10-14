@@ -217,3 +217,5 @@ body.dark ::-webkit-scrollbar-thumb:hover { background: #4a5365; border: 2px sol
 .ftag { width: 54px; font-size: 11px; text-align: center; color: var(--muted); }
 .adv-toggle { cursor: pointer; user-select: none; }
 .adv { border: 1px dashed var(--line); border-radius: 8px; padding: 10px 12px; margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+
+.modal-overlay[hidden] { display: none !important; }
