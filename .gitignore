@@ -13,3 +13,7 @@ node_modules/
 # 打包产物（Bun compile 编译指南）
 dist/
 assets.generated.js
+
+# 导出的项目数据（可能含涉敏信息，勿入库）
+*.idl.yaml
+*.didl

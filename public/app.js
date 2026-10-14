@@ -552,7 +552,7 @@ function exportProject() {
   const text = window.jsyaml.dump(root, { lineWidth: 120 });
   const name = (project.name || 'project').replace(/[^\w.-]+/g, '_');
   const ver = project.version || '1.0.0';
-  downloadText(text, name + '-v' + ver + '.idl.yaml', 'text/yaml');
+  downloadText(text, name + '-v' + ver + '.didl', 'text/yaml');
   saveStatus('已导出项目 IDL');
 }
 function downloadText(text, filename, mime) {
