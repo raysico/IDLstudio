@@ -130,6 +130,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .tab-panel[hidden] { display: none !important; } /* 修复 hidden 被 display:flex 覆盖导致四面板纵排 */
 .panel-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 2px; }
 .hist-hint { font-size: 11px; color: var(--muted); }
+.toolbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 #sourceInput {
   flex: 1; width: 100%; resize: none; padding: 9px; border: 1px solid var(--line); border-radius: 6px;
   font-size: 12px; line-height: 1.5; background: #0f1115; color: #d4d4d4;

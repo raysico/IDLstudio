@@ -56,10 +56,12 @@
     <div class="tab-panel" id="panel-source">
       <div class="panel-toolbar">
         <span class="hist-hint">YAML 源码（编辑后回车/失焦即回填表单）</span>
-        <button id="exportBtn" class="btn" title="导出项目 IDL + 备注到文件，可在其他设备导入继续编辑">导出项目</button>
-        <button id="importIdlBtn" class="btn" title="导入 IDL yaml/json 文件还原项目">导入 IDL</button>
-        <input type="file" id="importIdlInput" accept=".yaml,.yml,.json" hidden>
-        <span id="sourceStatus" class="buf-status"></span>
+        <div class="toolbar-actions">
+          <span id="sourceStatus" class="buf-status"></span>
+          <button id="exportBtn" class="btn" title="导出项目 IDL + 备注到文件，可在其他设备导入继续编辑">导出项目</button>
+          <button id="importIdlBtn" class="btn" title="导入 IDL yaml/json 文件还原项目">导入 IDL</button>
+          <input type="file" id="importIdlInput" accept=".yaml,.yml,.json" hidden>
+        </div>
       </div>
       <textarea id="sourceInput" spellcheck="false"></textarea>
     </div>
