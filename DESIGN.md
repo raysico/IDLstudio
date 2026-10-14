@@ -179,7 +179,7 @@ IDLstudio/
 ### 9.6 分期
 1. **阶段一**（✅ 已实施）：OpenAPI yaml/json 导入续写 + 无损属性 `tag`（字段编号）+ `imports`（项目）+ `reserved`（模型，编号/名称）
 2. **阶段二**（✅ 已实施）：`oneof`（互斥字段组：字段行 oneof 组名 → proto `oneof 块` / OpenAPI `oneOf`）+ `stream`（方法级 none/server/client/bidi → proto `stream Xxx` / OpenAPI `x-streaming`；导入反向映射：`x-streaming`→stream、schema `oneOf`→合成 oneof 模型）
-3. **阶段三**：`options` 兜底袋
+3. **阶段三**（✅ 已实施）：`options` 兜底袋（项目/消息/字段/方法四层 JSON 录入；proto 原样回写：文件级 `option`、message 级 `option`、字段 `[ k = v ]`、method `{ option }`；OpenAPI 按方向性忽略）
 
 ## 10. 验收
 - 通过表单或源码新增/修改一个资源与字段 → OpenAPI 与 proto 实时变化

@@ -26,16 +26,16 @@ let dark = false;
 
 // ---------- 内部模型 ----------
 function newField(o) {
-  return Object.assign({ id: uid(), name: '', type: 'string', required: false, in: 'body', desc: '', enum: [], itemsType: 'string', itemsRef: '', ref: '', mapValueType: 'string', mapValueRef: '', tag: 0, oneof: '' }, o || {});
+  return Object.assign({ id: uid(), name: '', type: 'string', required: false, in: 'body', desc: '', enum: [], itemsType: 'string', itemsRef: '', ref: '', mapValueType: 'string', mapValueRef: '', tag: 0, oneof: '', options: {} }, o || {});
 }
 function newMethod(o) {
-  return Object.assign({ id: uid(), name: '', http: '', desc: '', note: '', example: '', input: [], output: { kind: 'void', ref: '', fields: [] }, errors: [], stream: 'none' }, o || {});
+  return Object.assign({ id: uid(), name: '', http: '', desc: '', note: '', example: '', input: [], output: { kind: 'void', ref: '', fields: [] }, errors: [], stream: 'none', options: {} }, o || {});
 }
 function newResource(o) {
   return Object.assign({ id: uid(), name: '', desc: '', methods: [] }, o || {});
 }
 function newModel(o) {
-  return Object.assign({ id: uid(), name: '', desc: '', fields: [], reserved: { numbers: [], names: [] } }, o || {});
+  return Object.assign({ id: uid(), name: '', desc: '', fields: [], reserved: { numbers: [], names: [] }, options: {} }, o || {});
 }
 
 function defaultProject() {
@@ -69,7 +69,7 @@ function defaultProject() {
   ], output: { kind: 'void', ref: '', fields: [] }, errors: [404] });
 
   return {
-    name: 'MyService', version: '1.0.0', description: '', imports: [],
+    name: 'MyService', version: '1.0.0', description: '', imports: [], options: {},
     resources: [newResource({ name: 'Node', desc: '节点资源', methods: [create, get, list, update, del] })],
     models: [node],
   };
@@ -80,6 +80,17 @@ function findMethod(mId) { for (const r of project.resources) { const m = r.meth
 function findModel(mId) { return project.models.find((m) => m.id === mId); }
 
 // ---------- YAML 源码：序列化 / 解析 ----------
+// ---------- options 兜底袋 ----------
+function optNonEmpty(o) { return o && typeof o === 'object' && Object.keys(o).length ? o : null; }
+function parseOptions(text) {
+  try { const v = window.jsyaml.load(text || '{}'); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; } catch (e) { return {}; }
+}
+function optsToText(o) {
+  const k = optNonEmpty(o); return k ? window.jsyaml.dump(k) : '';
+}
+function optVal(v) { return typeof v === 'string' ? '"' + v.replace(/"/g, '\\"') + '"' : String(v); }
+function protoOptionsInline(o) { return Object.keys(o || {}).map((k) => k + ' = ' + optVal(o[k])).join(', '); }
+
 function fieldToYaml(f) {
   const o = {};
   if (f.type !== 'string') o.type = f.type;
@@ -88,6 +99,7 @@ function fieldToYaml(f) {
   if (f.desc) o.desc = f.desc;
   if (f.tag > 0) o.tag = f.tag;
   if (f.oneof) o.oneof = f.oneof;
+  if (optNonEmpty(f.options)) o.options = f.options;
   if (f.type === 'enum' && f.enum && f.enum.length) o.enum = f.enum;
   if (f.type === 'array') {
     o.items = f.itemsType === 'ref' ? { type: 'ref', ref: f.itemsRef } : f.itemsType;
@@ -112,6 +124,7 @@ function toYamlSource() {
   root.version = project.version || '1.0.0';
   if (project.description) root.description = project.description;
   if (project.imports && project.imports.length) root.imports = project.imports;
+  if (optNonEmpty(project.options)) root.options = project.options;
   const res = {};
   for (const r of project.resources) {
     const ro = { description: r.desc || undefined };
@@ -123,6 +136,7 @@ function toYamlSource() {
       if (m.note) mo.note = m.note;
       if (m.example) mo.example = m.example;
       if (m.stream && m.stream !== 'none') mo.stream = m.stream;
+      if (optNonEmpty(m.options)) mo.options = m.options;
       const inp = fieldsToYamlMap(m.input);
       if (Object.keys(inp).length) mo.input = inp;
       const out = outputToYaml(m.output);
@@ -140,6 +154,7 @@ function toYamlSource() {
     if (m.reserved && ((m.reserved.numbers && m.reserved.numbers.length) || (m.reserved.names && m.reserved.names.length))) {
       mo['_reserved'] = { numbers: (m.reserved.numbers || []), names: (m.reserved.names || []) };
     }
+    if (optNonEmpty(m.options)) mo.options = m.options;
     models[m.name] = mo;
   }
   root.models = models;
@@ -156,6 +171,7 @@ function yamlToField(name, raw) {
   if (raw.desc) f.desc = String(raw.desc);
   if (raw.tag) f.tag = Number(raw.tag) || 0;
   if (raw.oneof) f.oneof = String(raw.oneof);
+  if (raw.options && typeof raw.options === 'object') f.options = raw.options;
   if (Array.isArray(raw.enum)) f.enum = raw.enum.map(String);
   if (f.type === 'array') {
     if (typeof raw.items === 'string') { f.itemsType = raw.items; f.itemsRef = ''; }
@@ -169,14 +185,14 @@ function yamlToField(name, raw) {
   return f;
 }
 function parseYamlToProject(root) {
-  const p = { name: String(root.name || 'MyService'), version: String(root.version || '1.0.0'), description: String(root.description || ''), imports: Array.isArray(root.imports) ? root.imports.map(String) : [], resources: [], models: [] };
+  const p = { name: String(root.name || 'MyService'), version: String(root.version || '1.0.0'), description: String(root.description || ''), imports: Array.isArray(root.imports) ? root.imports.map(String) : [], options: (root.options && typeof root.options === 'object') ? root.options : {}, resources: [], models: [] };
   const res = root.resources || {};
   for (const [rname, ro] of Object.entries(res)) {
     if (!rname) continue;
     const r = newResource({ name: rname, desc: (ro && ro.description) || '' });
     const methods = (ro && ro.methods) || {};
     for (const [mname, mo] of Object.entries(methods)) {
-      const m = newMethod({ name: mname, http: (mo && mo.http) || '', desc: (mo && mo.description) || '', note: (mo && mo.note != null) ? String(mo.note) : '', example: (mo && mo.example != null) ? String(mo.example) : '', stream: (mo && mo.stream) || 'none' });
+      const m = newMethod({ name: mname, http: (mo && mo.http) || '', desc: (mo && mo.description) || '', note: (mo && mo.note != null) ? String(mo.note) : '', example: (mo && mo.example != null) ? String(mo.example) : '', stream: (mo && mo.stream) || 'none', options: (mo && mo.options && typeof mo.options === 'object') ? mo.options : {} });
       const inp = (mo && mo.input) || {};
       for (const [fname, fraw] of Object.entries(inp)) m.input.push(yamlToField(fname, fraw));
       const out = (mo && mo.output);
@@ -200,6 +216,7 @@ function parseYamlToProject(root) {
         mm.reserved = { numbers: (fraw && fraw.numbers || []).map(Number).filter((n) => !isNaN(n)), names: (fraw && fraw.names || []).map(String) };
         continue;
       }
+      if (fname === 'options') { mm.options = (fraw && typeof fraw === 'object') ? fraw : {}; continue; }
       mm.fields.push(yamlToField(fname, fraw));
     }
     p.models.push(mm);
@@ -369,7 +386,7 @@ function fmtReservedNumbers(nums) {
   }
   return parts.join(', ');
 }
-function messageText(name, fields, reserved) {
+function messageText(name, fields, reserved, options) {
   const lines = ['message ' + name + ' {'];
   const used = new Set();
   const resvNums = (reserved && reserved.numbers) || [];
@@ -378,7 +395,8 @@ function messageText(name, fields, reserved) {
     let n = (f.tag > 0) ? f.tag : 0;
     if (n <= 0) { do { n++; } while (used.has(n) || resvNums.includes(n)); }
     used.add(n);
-    lines.push(indent + protoType(f, name) + ' ' + snake(f.name) + ' = ' + n + ';');
+    const opts = optNonEmpty(f.options) ? ' [' + protoOptionsInline(f.options) + ']' : '';
+    lines.push(indent + protoType(f, name) + ' ' + snake(f.name) + ' = ' + n + opts + ';');
   };
   for (const f of fields) {
     if (!f.name) continue;
@@ -390,6 +408,8 @@ function messageText(name, fields, reserved) {
     for (const f of groups[gname]) emitField(f, '    ');
     lines.push('  }');
   }
+  const msgOpts = optNonEmpty(options);
+  if (msgOpts) Object.keys(msgOpts).forEach((k) => lines.push('  option ' + k + ' = ' + optVal(msgOpts[k]) + ';'));
   if (reserved && reserved.names && reserved.names.length) lines.push('  reserved ' + reserved.names.map((x) => '"' + x + '"').join(', ') + ';');
   if (resvNums.length) lines.push('  reserved ' + fmtReservedNumbers(resvNums) + ';');
   lines.push('}');
@@ -421,7 +441,7 @@ function toProto() {
   // models
   for (const m of project.models) {
     if (!m.name) continue;
-    chunks.push(messageText(m.name, m.fields, m.reserved));
+    chunks.push(messageText(m.name, m.fields, m.reserved, m.options));
     for (const f of m.fields) if (f.type === 'timestamp') usesTs = true;
   }
   // services + request/response
@@ -438,7 +458,14 @@ function toProto() {
       if (m.note) svc.push('  // ' + String(m.note).split('\n').join('\n  // '));
       const streamIn = (m.stream === 'client' || m.stream === 'bidi') ? 'stream ' : '';
       const streamOut = (m.stream === 'server' || m.stream === 'bidi') ? 'stream ' : '';
-      svc.push('  rpc ' + ctx + '(' + streamIn + reqName + ') returns (' + streamOut + respName + ');');
+      const mopts = optNonEmpty(m.options);
+      if (mopts) {
+        svc.push('  rpc ' + ctx + '(' + streamIn + reqName + ') returns (' + streamOut + respName + ') {');
+        Object.keys(mopts).forEach((k) => svc.push('    option ' + k + ' = ' + optVal(mopts[k]) + ';'));
+        svc.push('  }');
+      } else {
+        svc.push('  rpc ' + ctx + '(' + streamIn + reqName + ') returns (' + streamOut + respName + ');');
+      }
       chunks.push(messageText(reqName, m.input));
       for (const f of m.input) if (f.type === 'timestamp') usesTs = true;
       if (m.output.kind === 'inline') {
@@ -455,6 +482,11 @@ function toProto() {
   for (const imp of (project.imports || [])) addImport(imp);
   const pkgIdx = chunks.findIndex((c) => c.startsWith('package '));
   for (let i = importList.length - 1; i >= 0; i--) chunks.splice(pkgIdx + 1, 0, 'import "' + importList[i] + '";');
+  const fileOpts = optNonEmpty(project.options);
+  if (fileOpts) {
+    const optLines = Object.keys(fileOpts).map((k) => 'option ' + k + ' = ' + optVal(fileOpts[k]) + ';');
+    chunks.splice(pkgIdx + 1 + importList.length, 0, ...optLines);
+  }
   return chunks.filter((c) => c.trim() !== '').join('\n\n') + '\n';
 }
 
@@ -505,10 +537,12 @@ function select(kind, id) {
   renderTree();
   renderForm();
 }
+function openProjectInfo() { sel = { kind: null, id: null }; renderTree(); renderForm(); }
 function renderForm() {
   const head = $('formHead'), body = $('formBody');
   head.innerHTML = ''; body.innerHTML = '';
   if ($('projBtn')) $('projBtn').classList.toggle('active', !sel.kind);
+  if ($('specBadge')) $('specBadge').classList.toggle('active', !sel.kind);
   let title = '', tag = '', desc = '';
   if (sel.kind === 'resource') {
     const r = findRes(sel.id); if (!r) return;
@@ -542,6 +576,7 @@ function renderForm() {
       '<div class="adv" id="advBody" hidden>' +
       '<label class="fld grow"><span>reserved 编号（逗号分隔，proto 线兼容保护）</span><input id="resNumbers" value="' + esc((m.reserved.numbers || []).join(',')) + '" placeholder="2, 15, 9 to 11"></label>' +
       '<label class="fld grow"><span>reserved 名称（逗号分隔）</span><input id="resNames" value="' + esc((m.reserved.names || []).join(',')) + '" placeholder="old_field, obsolete"></label>' +
+      '<label class="fld grow"><span>options（proto message 级，JSON）</span><textarea id="modOptions" class="code" rows="2" placeholder=' + "'" + '{"deprecated": true}' + "'" + '>' + esc(optsToText(m.options)) + '</textarea></label>' +
       '</div>';
     const fc = $('flds'); m.fields.forEach((f) => fc.appendChild(fieldRow(f, 'model')));
     $('addFld').onclick = () => { m.fields.push(newField()); refreshDerived(); renderForm(); };
@@ -550,6 +585,7 @@ function renderForm() {
     advToggle.onclick = () => { advBody.hidden = !advBody.hidden; advToggle.textContent = advBody.hidden ? '高级(proto)属性 ▸' : '高级(proto)属性 ▾'; };
     bindText('resNumbers', (v) => { m.reserved.numbers = v.split(/[,，\s]+/).map(Number).filter((n) => !isNaN(n)); refreshDerived(); });
     bindText('resNames', (v) => { m.reserved.names = v.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean); refreshDerived(); });
+    bindText('modOptions', (v) => { m.options = parseOptions(v); refreshDerived(); });
     return;
   }
   if (sel.kind === 'method') {
@@ -569,6 +605,7 @@ function renderForm() {
       '<label class="fld grow"><span>描述</span><input id="mDesc" value="' + esc(m.desc) + '" placeholder="描述"></label>' +
       '<label class="fld grow"><span>备注说明</span><textarea id="mNote" class="code" rows="2" placeholder="写该方法的备注、注意事项、调用说明等（仅文档用途，不影响生成契约）">' + esc(m.note) + '</textarea></label>' +
       '<label class="fld grow"><span>预期正常返回示例（200）</span><textarea id="mExample" class="code" rows="3" placeholder=' + "'" + '{"id":"1","name":"示例","status":"published"}' + "'" + '>预期返回的示例 JSON/YAML；填写后调试台发送 200 时直接用它作为响应</textarea>' + '</label>' +
+      '<label class="fld grow"><span>options（proto method 级，JSON）</span><textarea id="mOpts" class="code" rows="2" placeholder=' + "'" + '{"deprecated": true}' + "'" + '>' + esc(optsToText(m.options)) + '</textarea></label>' +
       '<div class="group-label">输入字段 input</div><div id="inflds"></div><button class="btn sm" id="addIn">＋ 输入字段</button>' +
       '<div class="group-label">输出 output</div>' +
       '<div class="row wrap">' +
@@ -585,6 +622,7 @@ function renderForm() {
     bindText('mDesc', (v) => { m.desc = v; refreshDerived(); });
     bindText('mNote', (v) => { m.note = v; refreshDerived(); });
     bindText('mExample', (v) => { m.example = v; refreshDerived(); });
+    bindText('mOpts', (v) => { m.options = parseOptions(v); refreshDerived(); });
     const inf = $('inflds'); m.input.forEach((f) => inf.appendChild(fieldRow(f, 'input')));
     $('addIn').onclick = () => { m.input.push(newField()); refreshDerived(); renderForm(); };
     $('outKind').value = m.output.kind;
@@ -621,11 +659,13 @@ function renderForm() {
     '<label class="fld grow"><span>版本</span><input id="projVersion" value="' + esc(project.version || '') + '" placeholder="1.0.0"></label>' +
     '<label class="fld grow"><span>描述</span><textarea id="projDesc" class="code" rows="2" placeholder="服务简介">' + esc(project.description || '') + '</textarea></label>' +
     '<label class="fld grow"><span>proto imports（每行一个，如 google/protobuf/timestamp.proto）</span><textarea id="projImports" class="code" rows="2" placeholder="google/protobuf/timestamp.proto">' + esc((project.imports || []).join('\n')) + '</textarea></label>' +
+    '<label class="fld grow"><span>options（proto 文件级，JSON）</span><textarea id="projOptions" class="code" rows="2" placeholder=' + "'" + '{"java_package": "com.example.msg"}' + "'" + '>' + esc(optsToText(project.options)) + '</textarea></label>' +
     '<div class="group-label">在左侧选择资源 / 方法 / 模型开始设计</div>';
   bindText('projName', (v) => { project.name = v; refreshDerived(); });
   bindText('projVersion', (v) => { project.version = v; refreshDerived(); });
   bindText('projDesc', (v) => { project.description = v; refreshDerived(); });
   $('projImports').addEventListener('input', (e) => { project.imports = e.target.value.split(/\n/).map((s) => s.trim()).filter(Boolean); refreshDerived(); });
+  bindText('projOptions', (v) => { project.options = parseOptions(v); refreshDerived(); });
 }
 function bindText(id, fn) {
   const el = $(id); if (!el) return;
@@ -642,6 +682,7 @@ function fieldRow(f, ctx) {
     '<span class="fmeta"></span>' +
     '<input class="ftag fld xs" title="proto 字段编号（tag，留空自动）" placeholder="tag" value="' + esc(f.tag || '') + '">' +
     '<input class="foneof fld sm" title="oneof 组名（同组字段归一个互斥组，proto 生成 oneof 块）" placeholder="oneof组" value="' + esc(f.oneof || '') + '">' +
+    '<input class="fopts fld xs" title="proto 字段 options（JSON，如 {deprecated:true}）" placeholder="opts" value="' + esc(optNonEmpty(f.options) ? JSON.stringify(f.options) : '') + '">' +
     '<span class="mact del">✕</span>';
   row.querySelector('.ftype').value = f.type;
   if (f.in && ['path', 'query', 'header'].includes(f.in)) row.querySelector('.floc').value = f.in;
@@ -653,6 +694,7 @@ function fieldRow(f, ctx) {
   freq.onchange = () => { f.required = freq.checked; refreshDerived(); };
   row.querySelector('.ftag').oninput = (e) => { f.tag = parseInt(e.target.value, 10) || 0; refreshDerived(); };
   row.querySelector('.foneof').oninput = (e) => { f.oneof = e.target.value.trim(); refreshDerived(); };
+  row.querySelector('.fopts').oninput = (e) => { f.options = parseOptions(e.target.value); refreshDerived(); };
   row.querySelector('.del').onclick = (e) => { e.stopPropagation(); removeField(f, ctx); };
   // 类型相关附加控件
   const meta = row.querySelector('.fmeta');
@@ -1016,7 +1058,8 @@ function doImport() {
 async function init() {
   $('saveBtn').onclick = saveProject;
   $('loadBtn').onclick = loadProject;
-  $('projBtn').onclick = () => { sel = { kind: null, id: null }; renderTree(); renderForm(); };
+  $('projBtn').onclick = openProjectInfo;
+  $('specBadge').onclick = openProjectInfo;
   $('addResourceBtn').onclick = addResource;
   $('addModelBtn').onclick = addModel;
   $('importBtn').onclick = openImport;

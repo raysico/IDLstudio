@@ -13,10 +13,10 @@
   const refName = (ref) => String(ref || '').split('/').pop();
 
   function newField(o) {
-    return Object.assign({ id: uid(), name: '', type: 'string', required: false, in: 'body', desc: '', enum: [], itemsType: 'string', itemsRef: '', ref: '', mapValueType: 'string', mapValueRef: '', tag: 0 }, o || {});
+    return Object.assign({ id: uid(), name: '', type: 'string', required: false, in: 'body', desc: '', enum: [], itemsType: 'string', itemsRef: '', ref: '', mapValueType: 'string', mapValueRef: '', tag: 0, oneof: '', options: {} }, o || {});
   }
   function newModel(o) {
-    return Object.assign({ id: uid(), name: '', desc: '', fields: [], reserved: { numbers: [], names: [] } }, o || {});
+    return Object.assign({ id: uid(), name: '', desc: '', fields: [], reserved: { numbers: [], names: [] }, options: {} }, o || {});
   }
 
   // JSON Schema 片段 -> IDL 字段
@@ -131,7 +131,7 @@
         if (!resByKey[resName]) { resByKey[resName] = { id: uid(), name: resName, desc: '', methods: [] }; resources.push(resByKey[resName]); }
         const r = resByKey[resName];
         const mName = op.operationId ? pascal(op.operationId) : pascal(verb + ' ' + resName);
-        const m = { id: uid(), name: mName, http: verb.toUpperCase() + ' ' + path, desc: op.summary || '', note: op['x-note'] || op.description || '', example: '', input: [], output: { kind: 'void', ref: '', fields: [] }, errors: [], stream: (op['x-streaming'] && ['server', 'client', 'bidi'].includes(op['x-streaming'])) ? op['x-streaming'] : 'none' };
+        const m = { id: uid(), name: mName, http: verb.toUpperCase() + ' ' + path, desc: op.summary || '', note: op['x-note'] || op.description || '', example: '', input: [], output: { kind: 'void', ref: '', fields: [] }, errors: [], stream: (op['x-streaming'] && ['server', 'client', 'bidi'].includes(op['x-streaming'])) ? op['x-streaming'] : 'none', options: {} };
         // parameters
         const params = op.parameters || [];
         for (const p of params) {
