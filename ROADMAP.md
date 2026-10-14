@@ -9,6 +9,7 @@
 - 兜底袋：`options`（项目/模型/字段/方法四层）、`reserved`、`oneof`、`stream`、`tag`、`imports`
 - 导出 / 导入：OpenAPI 3.x → DIDL 续写；DIDL（.didl/.yaml/.json）跨设备还原
 - 导入仅支持 **OpenAPI**；**proto 反向导入未实现**
+- 已加固（1.0.1）：proto 标识符冲突——字段名 / 枚举常量 snake 归一后去重并数字后缀避让，冲突记入日志
 
 ### 已知有损点（需逐条收敛）
 
