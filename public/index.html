@@ -17,6 +17,7 @@
   <div class="meta">
     <button id="addResourceBtn" class="btn" title="新增一个资源">＋ 资源</button>
     <button id="addModelBtn" class="btn" title="新增一个模型">＋ 模型</button>
+    <button id="importBtn" class="btn" title="导入 OpenAPI yaml/json 续写">导入</button>
     <button id="saveBtn" class="btn primary" title="保存 IDL 项目到本地 project.json">保存</button>
     <button id="loadBtn" class="btn" title="从本地 project.json 载入">载入</button>
     <span id="saveStatus" class="buf-status"></span>
@@ -77,7 +78,27 @@
   </aside>
 </main>
 
+<!-- 导入 OpenAPI 弹窗 -->
+<div id="importModal" class="modal-overlay" hidden>
+  <div class="modal">
+    <div class="modal-head"><span class="ftitle">导入 OpenAPI yaml/json 续写</span><button id="impClose" class="btn" title="关闭">×</button></div>
+    <div class="modal-body">
+      <textarea id="impText" class="code" rows="12" placeholder="粘贴 OpenAPI 3.x 的 JSON 或 YAML 源码；或选择文件导入"></textarea>
+      <div class="row wrap" style="margin-top:8px">
+        <button class="btn" id="impFile">选择文件…</button>
+        <span class="hist-hint">支持 .yaml / .yml / .json；导入会覆盖当前项目（可先保存）</span>
+      </div>
+      <input type="file" id="impFileInput" accept=".yaml,.yml,.json" hidden>
+      <div id="impWarn" class="imp-warn"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn primary" id="impConfirm">导入（覆盖当前项目）</button>
+    </div>
+  </div>
+</div>
+
 <script src="/vendor/js-yaml.min.js"></script>
+<script src="/importer.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

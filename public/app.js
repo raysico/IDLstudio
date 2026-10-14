@@ -26,7 +26,7 @@ let dark = false;
 
 // ---------- 内部模型 ----------
 function newField(o) {
-  return Object.assign({ id: uid(), name: '', type: 'string', required: false, in: 'body', desc: '', enum: [], itemsType: 'string', itemsRef: '', ref: '', mapValueType: 'string', mapValueRef: '' }, o || {});
+  return Object.assign({ id: uid(), name: '', type: 'string', required: false, in: 'body', desc: '', enum: [], itemsType: 'string', itemsRef: '', ref: '', mapValueType: 'string', mapValueRef: '', tag: 0 }, o || {});
 }
 function newMethod(o) {
   return Object.assign({ id: uid(), name: '', http: '', desc: '', note: '', example: '', input: [], output: { kind: 'void', ref: '', fields: [] }, errors: [] }, o || {});
@@ -35,7 +35,7 @@ function newResource(o) {
   return Object.assign({ id: uid(), name: '', desc: '', methods: [] }, o || {});
 }
 function newModel(o) {
-  return Object.assign({ id: uid(), name: '', desc: '', fields: [] }, o || {});
+  return Object.assign({ id: uid(), name: '', desc: '', fields: [], reserved: { numbers: [], names: [] } }, o || {});
 }
 
 function defaultProject() {
@@ -69,7 +69,7 @@ function defaultProject() {
   ], output: { kind: 'void', ref: '', fields: [] }, errors: [404] });
 
   return {
-    name: 'MyService', version: '1.0.0',
+    name: 'MyService', version: '1.0.0', imports: [],
     resources: [newResource({ name: 'Node', desc: '节点资源', methods: [create, get, list, update, del] })],
     models: [node],
   };
@@ -86,6 +86,7 @@ function fieldToYaml(f) {
   if (f.in !== 'body') o.in = f.in;
   if (f.required) o.required = true;
   if (f.desc) o.desc = f.desc;
+  if (f.tag > 0) o.tag = f.tag;
   if (f.type === 'enum' && f.enum && f.enum.length) o.enum = f.enum;
   if (f.type === 'array') {
     o.items = f.itemsType === 'ref' ? { type: 'ref', ref: f.itemsRef } : f.itemsType;
@@ -108,6 +109,7 @@ function toYamlSource() {
   const root = {};
   root.name = project.name || 'MyService';
   root.version = project.version || '1.0.0';
+  if (project.imports && project.imports.length) root.imports = project.imports;
   const res = {};
   for (const r of project.resources) {
     const ro = { description: r.desc || undefined };
@@ -131,7 +133,11 @@ function toYamlSource() {
   root.resources = res;
   const models = {};
   for (const m of project.models) {
-    models[m.name] = fieldsToYamlMap(m.fields);
+    const mo = fieldsToYamlMap(m.fields);
+    if (m.reserved && ((m.reserved.numbers && m.reserved.numbers.length) || (m.reserved.names && m.reserved.names.length))) {
+      mo['_reserved'] = { numbers: (m.reserved.numbers || []), names: (m.reserved.names || []) };
+    }
+    models[m.name] = mo;
   }
   root.models = models;
   return root;
@@ -145,6 +151,7 @@ function yamlToField(name, raw) {
   if (raw.in) f.in = raw.in;
   if (raw.required) f.required = true;
   if (raw.desc) f.desc = String(raw.desc);
+  if (raw.tag) f.tag = Number(raw.tag) || 0;
   if (Array.isArray(raw.enum)) f.enum = raw.enum.map(String);
   if (f.type === 'array') {
     if (typeof raw.items === 'string') { f.itemsType = raw.items; f.itemsRef = ''; }
@@ -158,7 +165,7 @@ function yamlToField(name, raw) {
   return f;
 }
 function parseYamlToProject(root) {
-  const p = { name: String(root.name || 'MyService'), version: String(root.version || '1.0.0'), resources: [], models: [] };
+  const p = { name: String(root.name || 'MyService'), version: String(root.version || '1.0.0'), imports: Array.isArray(root.imports) ? root.imports.map(String) : [], resources: [], models: [] };
   const res = root.resources || {};
   for (const [rname, ro] of Object.entries(res)) {
     if (!rname) continue;
@@ -184,7 +191,13 @@ function parseYamlToProject(root) {
   for (const [mname, mo] of Object.entries(models)) {
     if (!mname) continue;
     const mm = newModel({ name: mname });
-    for (const [fname, fraw] of Object.entries(mo || {})) mm.fields.push(yamlToField(fname, fraw));
+    for (const [fname, fraw] of Object.entries(mo || {})) {
+      if (fname === '_reserved') {
+        mm.reserved = { numbers: (fraw && fraw.numbers || []).map(Number).filter((n) => !isNaN(n)), names: (fraw && fraw.names || []).map(String) };
+        continue;
+      }
+      mm.fields.push(yamlToField(fname, fraw));
+    }
     p.models.push(mm);
   }
   return p;
@@ -327,20 +340,39 @@ function protoElem(type, ref, ctx, f) {
   return type === 'int' ? 'int64' : type === 'number' ? 'double' : type === 'bool' ? 'bool' : type;
 }
 function enumName(ctx, f) { return pascal(ctx) + pascal(f.name) + 'Value'; }
-function messageText(name, fields) {
+function fmtReservedNumbers(nums) {
+  const a = Array.from(new Set((nums || []).map(Number).filter((n) => !isNaN(n) && n > 0))).sort((x, y) => x - y);
+  const parts = [];
+  let start = a[0], prev = a[0];
+  for (let i = 1; i <= a.length; i++) {
+    const x = a[i];
+    if (x === prev + 1) { prev = x; continue; }
+    parts.push(start === prev ? String(start) : start + ' to ' + prev);
+    start = x; prev = x;
+  }
+  return parts.join(', ');
+}
+function messageText(name, fields, reserved) {
   const lines = ['message ' + name + ' {'];
-  let n = 1;
+  const used = new Set();
+  const resvNums = (reserved && reserved.numbers) || [];
   for (const f of fields) {
     if (!f.name) continue;
+    let n = (f.tag > 0) ? f.tag : 0;
+    if (n <= 0) { do { n++; } while (used.has(n) || resvNums.includes(n)); }
+    used.add(n);
     lines.push('  ' + protoType(f, name) + ' ' + snake(f.name) + ' = ' + n + ';');
-    n++;
   }
+  if (reserved && reserved.names && reserved.names.length) lines.push('  reserved ' + reserved.names.map((x) => '"' + x + '"').join(', ') + ';');
+  if (resvNums.length) lines.push('  reserved ' + fmtReservedNumbers(resvNums) + ';');
   lines.push('}');
   return lines.join('\n');
 }
 function toProto() {
   const pkg = (project.name || 'service').toLowerCase().replace(/[^a-z0-9_.]/g, '_');
   const chunks = ['syntax = "proto3";', '', 'package ' + pkg + ';'];
+  const importList = [];
+  const addImport = (imp) => { if (imp && !importList.includes(imp)) importList.push(imp); };
   let usesTs = false, usesEmpty = false;
   // 收集枚举
   const enumBlocks = [];
@@ -362,7 +394,7 @@ function toProto() {
   // models
   for (const m of project.models) {
     if (!m.name) continue;
-    chunks.push(messageText(m.name, m.fields));
+    chunks.push(messageText(m.name, m.fields, m.reserved));
     for (const f of m.fields) if (f.type === 'timestamp') usesTs = true;
   }
   // services + request/response
@@ -389,8 +421,11 @@ function toProto() {
     chunks.push(svc.join('\n'));
   }
   if (enumBlocks.length) chunks.push(enumBlocks.join('\n\n'));
-  if (usesTs) chunks.splice(2, 0, 'import "google/protobuf/timestamp.proto";');
-  if (usesEmpty) chunks.splice(2, 0, 'import "google/protobuf/empty.proto";');
+  if (usesTs) addImport('google/protobuf/timestamp.proto');
+  if (usesEmpty) addImport('google/protobuf/empty.proto');
+  for (const imp of (project.imports || [])) addImport(imp);
+  const pkgIdx = chunks.findIndex((c) => c.startsWith('package '));
+  for (let i = importList.length - 1; i >= 0; i--) chunks.splice(pkgIdx + 1, 0, 'import "' + importList[i] + '";');
   return chunks.filter((c) => c.trim() !== '').join('\n\n') + '\n';
 }
 
@@ -467,14 +502,24 @@ function renderForm() {
   }
   if (sel.kind === 'model') {
     const m = findModel(sel.id); if (!m) return;
+    if (!m.reserved) m.reserved = { numbers: [], names: [] };
     tag = '模型'; title = m.name || '(未命名模型)'; desc = m.desc || '';
     head.innerHTML = '<span class="kind-tag">' + tag + '</span><span class="ftitle">' + esc(title) + '</span><input class="fld grow" id="mName" value="' + esc(m.name) + '" placeholder="模型名"><input class="fld grow" id="mDesc" value="' + esc(m.desc) + '" placeholder="描述">';
     bindText('mName', (v) => { m.name = v; refreshDerived(); });
     bindText('mDesc', (v) => { m.desc = v; refreshDerived(); });
-    body.innerHTML = '<div class="group-label">字段</div><div id="flds"></div><div class="actions"><button class="btn" id="addFld">＋ 字段</button><button class="btn danger" id="delModel">删除模型</button></div>';
+    body.innerHTML = '<div class="group-label">字段</div><div id="flds"></div><div class="actions"><button class="btn" id="addFld">＋ 字段</button><button class="btn danger" id="delModel">删除模型</button></div>' +
+      '<div class="group-label adv-toggle" id="advToggle">高级(proto)属性 ▸</div>' +
+      '<div class="adv" id="advBody" hidden>' +
+      '<label class="fld grow"><span>reserved 编号（逗号分隔，proto 线兼容保护）</span><input id="resNumbers" value="' + esc((m.reserved.numbers || []).join(',')) + '" placeholder="2, 15, 9 to 11"></label>' +
+      '<label class="fld grow"><span>reserved 名称（逗号分隔）</span><input id="resNames" value="' + esc((m.reserved.names || []).join(',')) + '" placeholder="old_field, obsolete"></label>' +
+      '</div>';
     const fc = $('flds'); m.fields.forEach((f) => fc.appendChild(fieldRow(f, 'model')));
     $('addFld').onclick = () => { m.fields.push(newField()); refreshDerived(); renderForm(); };
     $('delModel').onclick = () => { if (confirm('删除模型 ' + (m.name || '') + '？')) { project.models = project.models.filter((x) => x.id !== m.id); sel = { kind: null, id: null }; refreshDerived(); renderTree(); renderForm(); } };
+    const advToggle = $('advToggle'), advBody = $('advBody');
+    advToggle.onclick = () => { advBody.hidden = !advBody.hidden; advToggle.textContent = advBody.hidden ? '高级(proto)属性 ▸' : '高级(proto)属性 ▾'; };
+    bindText('resNumbers', (v) => { m.reserved.numbers = v.split(/[,，\s]+/).map(Number).filter((n) => !isNaN(n)); refreshDerived(); });
+    bindText('resNames', (v) => { m.reserved.names = v.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean); refreshDerived(); });
     return;
   }
   if (sel.kind === 'method') {
@@ -535,8 +580,17 @@ function renderForm() {
     $('delMethod').onclick = () => { if (confirm('删除方法 ' + (m.name || '') + '？')) { r.methods = r.methods.filter((x) => x.id !== m.id); sel = { kind: null, id: null }; refreshDerived(); renderTree(); renderForm(); } };
     return;
   }
-  // 未选中
-  head.innerHTML = '<span class="kind-tag">提示</span><span class="ftitle">在左侧选择资源 / 方法 / 模型开始设计</span>';
+  // 未选中 -> 项目级设置
+  if (!project.imports) project.imports = [];
+  head.innerHTML = '<span class="kind-tag">项目</span><span class="ftitle">' + esc(project.name || '') + ' v' + esc(project.version || '') + '</span>';
+  body.innerHTML =
+    '<label class="fld grow"><span>服务名</span><input id="projName" value="' + esc(project.name || '') + '" placeholder="MyService"></label>' +
+    '<label class="fld grow"><span>版本</span><input id="projVersion" value="' + esc(project.version || '') + '" placeholder="1.0.0"></label>' +
+    '<label class="fld grow"><span>proto imports（每行一个，如 google/protobuf/timestamp.proto）</span><textarea id="projImports" class="code" rows="2" placeholder="google/protobuf/timestamp.proto">' + esc((project.imports || []).join('\n')) + '</textarea></label>' +
+    '<div class="group-label">在左侧选择资源 / 方法 / 模型开始设计</div>';
+  bindText('projName', (v) => { project.name = v; refreshDerived(); });
+  bindText('projVersion', (v) => { project.version = v; refreshDerived(); });
+  $('projImports').addEventListener('input', (e) => { project.imports = e.target.value.split(/\n/).map((s) => s.trim()).filter(Boolean); refreshDerived(); });
 }
 function bindText(id, fn) {
   const el = $(id); if (!el) return;
@@ -551,6 +605,7 @@ function fieldRow(f, ctx) {
     '<label class="fld sm" data-if="loc"><select class="floc"><option value="body">body</option><option value="path">path</option><option value="query">query</option><option value="header">header</option></select></label>' +
     '<label class="fld"><input type="checkbox" class="freq" checked> <span>必填</span></label>' +
     '<span class="fmeta"></span>' +
+    '<input class="ftag fld xs" title="proto 字段编号（tag，留空自动）" placeholder="tag" value="' + esc(f.tag || '') + '">' +
     '<span class="mact del">✕</span>';
   row.querySelector('.ftype').value = f.type;
   if (f.in && ['path', 'query', 'header'].includes(f.in)) row.querySelector('.floc').value = f.in;
@@ -560,6 +615,7 @@ function fieldRow(f, ctx) {
   row.querySelector('.ftype').onchange = (e) => { f.type = e.target.value; refreshDerived(); renderForm(); };
   row.querySelector('.floc').onchange = (e) => { f.in = e.target.value; refreshDerived(); };
   freq.onchange = () => { f.required = freq.checked; refreshDerived(); };
+  row.querySelector('.ftag').oninput = (e) => { f.tag = parseInt(e.target.value, 10) || 0; refreshDerived(); };
   row.querySelector('.del').onclick = (e) => { e.stopPropagation(); removeField(f, ctx); };
   // 类型相关附加控件
   const meta = row.querySelector('.fmeta');
@@ -852,9 +908,40 @@ async function saveProject() {
 async function loadProject() {
   try {
     const d = await fetch('/api/project').then((r) => r.json());
-    if (d && d.ok && d.project) { project = d.project; refreshDerived(); renderTree(); renderForm(); saveStatus('已载入 project.json'); }
+    if (d && d.ok && d.project) { project = d.project; if (!project.imports) project.imports = []; refreshDerived(); renderTree(); renderForm(); saveStatus('已载入 project.json'); }
     else saveStatus('本地暂无项目');
   } catch (e) { saveStatus('载入失败'); }
+}
+
+// ---------- 导入 OpenAPI ----------
+function openImport() {
+  $('impText').value = '';
+  $('impWarn').innerHTML = '';
+  $('importModal').hidden = false;
+  $('impText').focus();
+}
+function closeImport() { $('importModal').hidden = true; }
+function showImpWarn(warnings) {
+  const el = $('impWarn');
+  if (!warnings || !warnings.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="imp-warn-title">导入提示（' + warnings.length + ' 条）：</div><ul>' + warnings.map((w) => '<li>' + esc(w) + '</li>').join('') + '</ul>';
+}
+function doImport() {
+  const text = $('impText').value;
+  try {
+    const res = window.parseOpenApiText(text);
+    const p = res.project;
+    if (!p.imports) p.imports = [];
+    project = p;
+    sel = { kind: null, id: null };
+    refreshDerived();
+    renderTree();
+    renderForm();
+    showImpWarn(res.warnings);
+    saveStatus('已导入 ' + p.resources.length + ' 资源 / ' + p.models.length + ' 模型');
+  } catch (e) {
+    $('impWarn').innerHTML = '<div class="imp-warn-title">导入失败：</div><ul><li>' + esc(e.message) + '</li></ul>';
+  }
 }
 
 async function init() {
@@ -862,6 +949,17 @@ async function init() {
   $('loadBtn').onclick = loadProject;
   $('addResourceBtn').onclick = addResource;
   $('addModelBtn').onclick = addModel;
+  $('importBtn').onclick = openImport;
+  $('impClose').onclick = closeImport;
+  $('impConfirm').onclick = () => { if (confirm('导入会覆盖当前项目（未保存的改动将丢失），确认？')) { doImport(); closeImport(); } };
+  $('impFile').onclick = () => $('impFileInput').click();
+  $('impFileInput').onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = () => { $('impText').value = String(r.result || ''); $('impWarn').innerHTML = ''; };
+    r.readAsText(file);
+  };
   $('filter').oninput = renderTree;
   $('sourceInput').addEventListener('input', onSourceEdit);
   window.addEventListener('keydown', (e) => {

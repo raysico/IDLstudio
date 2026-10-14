@@ -201,3 +201,19 @@ body.dark ::-webkit-scrollbar-thumb { background: #3a4150; border: 2px solid tra
 body.dark ::-webkit-scrollbar-thumb:hover { background: #4a5365; border: 2px solid transparent; background-clip: padding-box; }
 
 .theme-btn { padding: 2px 8px; font-size: 13px; line-height: 1; }
+
+/* —— 导入弹窗 / 高级属性 / tag —— */
+.modal-overlay { position: fixed; inset: 0; background: rgba(15,17,21,.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal { width: min(680px, 92vw); max-height: 86vh; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.28); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.modal-head .ftitle { font-weight: 700; }
+.modal-body { padding: 12px 14px; overflow: auto; display: flex; flex-direction: column; }
+.modal-body textarea.code { width: 100%; box-sizing: border-box; resize: vertical; }
+.modal-foot { padding: 10px 14px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
+.imp-warn { margin-top: 10px; font-size: 12px; color: var(--accent); }
+.imp-warn-title { font-weight: 700; margin-bottom: 4px; }
+.imp-warn ul { margin: 0 0 0 18px; padding: 0; }
+.fld.xs { width: 64px; flex: 0 0 auto; }
+.ftag { width: 54px; font-size: 11px; text-align: center; color: var(--muted); }
+.adv-toggle { cursor: pointer; user-select: none; }
+.adv { border: 1px dashed var(--line); border-radius: 8px; padding: 10px 12px; margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }

@@ -177,7 +177,7 @@ IDLstudio/
 - **无损验收标准**：导入 proto → 导出 → 再导入 → **逐字节一致**（golden round-trip）。
 
 ### 9.6 分期
-1. **阶段一**：`tag` + `imports` + `reserved`（线兼容关键，改动小）
+1. **阶段一**（✅ 已实施）：OpenAPI yaml/json 导入续写 + 无损属性 `tag`（字段编号）+ `imports`（项目）+ `reserved`（模型，编号/名称）
 2. **阶段二**：`oneof` + `stream`
 3. **阶段三**：`options` 兜底袋
 
