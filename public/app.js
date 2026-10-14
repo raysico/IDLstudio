@@ -495,14 +495,17 @@ function renderTree() {
   const kw = ($('filter').value || '').trim().toLowerCase();
   const el = $('tree');
   el.innerHTML = '';
-  const group = (title) => {
+  const group = (title, keyLetter) => {
     const g = document.createElement('div'); g.className = 'tree-group';
     const h = document.createElement('div'); h.className = 'tree-group-head';
-    h.innerHTML = '<span>' + title + '</span><span class="plus" title="新增">＋</span>';
+    h.innerHTML = '<span>' + title + '</span><span class="plus" title="新增 ' + keyLetter + '">＋</span>';
+    const kh = document.createElement('span'); kh.className = 'keyhint';
+    kh.innerHTML = keycapHint(keyLetter);
+    h.appendChild(kh);
     g.appendChild(h); el.appendChild(g);
     return { g, head: h };
   };
-  const resGroup = group('资源');
+  const resGroup = group('资源', 'R');
   resGroup.head.querySelector('.plus').onclick = addResource;
   for (const r of project.resources) {
     if (kw && !(r.name || '').toLowerCase().includes(kw)) continue;
@@ -516,7 +519,7 @@ function renderTree() {
       resGroup.g.appendChild(mi);
     }
   }
-  const modelGroup = group('模型');
+  const modelGroup = group('模型', 'M');
   modelGroup.head.querySelector('.plus').onclick = addModel;
   for (const m of project.models) {
     if (kw && !(m.name || '').toLowerCase().includes(kw)) continue;
@@ -1127,14 +1130,16 @@ function newGuard(fn) {
   if (activeTab === 'debug') { saveStatus('当前为调试台模式，请切回编辑标签后操作'); return; }
   fn();
 }
-// 顶栏「＋资源 / ＋模型」旁的快捷键键帽提示（平台自适应：mac=⌘，win=⌃）
+// 顶栏「＋资源 / ＋模型」与左面板分组头旁的快捷键键帽提示（平台自适应：mac=⌘，win=⌃）
 function kcap(g) { return '<kbd class="kc">' + g + '</kbd>'; }
-function renderKeyHints() {
+function keycapHint(letter) {
   const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || '');
   const M = isMac ? '⌘' : '⌃'; // Cmd(mac) / Ctrl(win)
-  const S = '⇧';
-  const h = $('resHint'); if (h) h.innerHTML = kcap(M) + kcap(S) + kcap('R');
-  const m = $('modelHint'); if (m) m.innerHTML = kcap(M) + kcap(S) + kcap('M');
+  return kcap(M) + kcap('⇧') + kcap(letter);
+}
+function renderKeyHints() {
+  const h = $('resKh'); if (h) h.innerHTML = keycapHint('R');
+  const m = $('modelKh'); if (m) m.innerHTML = keycapHint('M');
 }
 function addFieldShortcut() {
   if (activeTab === 'debug') { saveStatus('当前为调试台模式，请切回编辑标签后操作'); return; }
