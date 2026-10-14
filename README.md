@@ -1,4 +1,4 @@
-# IDLstudio
+# IDL Service Design Studio
 
 **内部 IDL 可视化设计台**：用表单设计一份与输出格式无关的中立 IDL 契约，实时「编译」生成
 **OpenAPI 3.1（REST）** 与 **protobuf / gRPC（RPC）** 两套契约，并内置 **mock 调试台**。

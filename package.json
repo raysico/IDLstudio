@@ -1,13 +1,32 @@
 {
-  "name": "idlstudio",
+  "name": "idl-service-design-studio",
   "version": "0.3.0",
-  "description": "内部 IDL 可视化设计台：用表单设计中立 IDL 契约，实时编译生成 OpenAPI 3.1（REST）与 protobuf/gRPC（RPC）两套契约，内置 mock 调试台",
+  "description": "IDL Service Design Studio：内部 IDL 可视化设计台，用表单设计中立 IDL 契约，实时编译生成 OpenAPI 3.1（REST）与 protobuf/gRPC（RPC）两套契约，内置 mock 调试台",
   "main": "server.js",
   "license": "MIT",
   "author": "何小点点 (hoxiudimdim) <raysico@users.noreply.github.com> (https://github.com/raysico)",
-  "repository": { "type": "git", "url": "https://github.com/raysico/IDLstudio.git" },
-  "keywords": ["idl","openapi","protobuf","grpc","api-design","yaml","contract","codegen"],
-  "engines": { "node": ">=16" },
-  "scripts": { "start": "node server.js", "check": "node --check server.js && node --check public/app.js" },
-  "dependencies": { "js-yaml": "^4.1.0" }
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/raysico/IDLstudio.git"
+  },
+  "keywords": [
+    "idl",
+    "openapi",
+    "protobuf",
+    "grpc",
+    "api-design",
+    "yaml",
+    "contract",
+    "codegen"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check public/app.js"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  }
 }

@@ -1,4 +1,4 @@
-# API 设计台 —— 设计文档
+# IDL Service Design Studio —— 设计文档
 
 > 内部 IDL 可视化设计工具：用表单设计一份中立的接口契约，实时「编译」生成 **OpenAPI 3.1（REST）** 与 **protobuf/gRPC（RPC）** 两套契约，并内置 mock 调试台。
 

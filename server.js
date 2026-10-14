@@ -1,5 +1,5 @@
 'use strict';
-// API 设计台 —— 本地服务
+// IDL Service Design Studio —— 本地服务
 // 功能：1) 提供静态页面 public/  2) 持久化 IDL 项目 /api/project
 // 仅绑定 127.0.0.1。IDL 的编译（OpenAPI / protobuf）在浏览器端完成，服务端只做保存。
 
@@ -53,7 +53,7 @@ function sendJSON(res, status, obj) {
 }
 
 function start() {
-  console.log('API 设计台（IDL -> OpenAPI / protobuf）');
+  console.log('IDL Service Design Studio（IDL -> OpenAPI / protobuf）');
   console.log('  打开     : http://' + HOST + ':' + PORT);
 
   const server = http.createServer(async (req, res) => {
