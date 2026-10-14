@@ -1,0 +1,11 @@
+# 依赖
+node_modules/
+
+# 运行生成 / 本地数据
+*.log
+*.swp
+.DS_Store
+
+# 注：project.json 为示例项目，默认保留并提交；
+# 如不希望跟踪你的本地改动，可取消下面注释：
+# project.json
