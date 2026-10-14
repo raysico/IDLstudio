@@ -6,6 +6,7 @@
 - **Spec-first**：IDL 是唯一真相源，REST 与 RPC 均由它生成，避免有损的 REST↔RPC 互译。
 - 面向资源的 API 设计方法论（Google AIP 风格）：资源 + 标准方法（Get/List/Create/Update/Delete）。
 - 交付两套契约：一份 OpenAPI（可直接喂给 tana/anytype 那种 OpenAPI 驱动调试客户端），一份 `.proto`（gRPC 契约）。
+- **产物 AI 友好**：生成的 OpenAPI / proto 自带备注（`x-note` / 注释）与预期返回示例，可直接交付给 AI/LLM 进行编程；无基础用户设计完即可转交 AI 实现，减少沟通成本。
 
 ## 2. 内部 IDL 语法（DSL）
 YAML 形态，与内部模型一一对应：
@@ -82,7 +83,7 @@ models:                # 可复用的数据结构
   - `output`：模型引用 → 200 schema `$ref`；内联对象 → 内联 schema；void → 空响应
   - `errors` 列表 → 对应状态码的 error responses
   - `note` → 附带为 OpenAPI 操作的 `x-note`，并在 proto 中作为 rpc 前的注释
-  - `example` → 作为 200 响应的 `content.application/json.example`（示例可 JSON 或 YAML，自动解析）
+  - `example` → 作为 200 响应的 `content.application/json.example`（示例可 JSON 或 YAML，自动解析）；用于前端按预期对接、调试台直接取用、以及交付 AI 时的契约示例
 - `components/schemas`：所有 `models` 转成 schema
 - 标准方法默认路由：`Create→POST /<复数>`、`Get→GET /<复数>/{id}`、`List→GET /<复数>`、`Update→PATCH /<复数>/{id}`、`Delete→DELETE /<复数>/{id}`；`http` 自定义则优先
 - 产物可直接用现有的 `tana-web-client` / `anytype-v2-web-client` 架构加载调试
@@ -100,7 +101,7 @@ models:                # 可复用的数据结构
 
 ## 6. 模块结构
 ```
-api-design-studio/
+IDLstudio/
 ├─ server.js            # 静态页 + /api/project 持久化（project.json）
 ├─ package.json         # 唯一依赖 js-yaml（源码解析）
 ├─ DESIGN.md            # 本文档
