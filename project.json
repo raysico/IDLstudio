@@ -1,0 +1,389 @@
+{
+  "name": "MyService",
+  "version": "1.0.0",
+  "description": "",
+  "imports": [],
+  "options": {},
+  "resources": [
+    {
+      "id": "yn61lhc",
+      "name": "Node",
+      "desc": "节点资源",
+      "methods": [
+        {
+          "id": "mqdxsup",
+          "name": "Create",
+          "http": "POST /nodes",
+          "desc": "创建节点",
+          "note": "",
+          "example": "",
+          "input": [
+            {
+              "id": "cxen3no",
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "in": "body",
+              "desc": "名称",
+              "enum": [],
+              "itemsType": "string",
+              "itemsRef": "",
+              "ref": "",
+              "mapValueType": "string",
+              "mapValueRef": "",
+              "tag": 0,
+              "oneof": "",
+              "options": {}
+            },
+            {
+              "id": "p8o95wb",
+              "name": "parentId",
+              "type": "ref",
+              "required": false,
+              "in": "body",
+              "desc": "父节点",
+              "enum": [],
+              "itemsType": "string",
+              "itemsRef": "",
+              "ref": "Node",
+              "mapValueType": "string",
+              "mapValueRef": "",
+              "tag": 0,
+              "oneof": "",
+              "options": {}
+            },
+            {
+              "id": "zcytt5v",
+              "name": "tags",
+              "type": "array",
+              "required": false,
+              "in": "body",
+              "desc": "标签",
+              "enum": [],
+              "itemsType": "string",
+              "itemsRef": "",
+              "ref": "",
+              "mapValueType": "string",
+              "mapValueRef": "",
+              "tag": 0,
+              "oneof": "",
+              "options": {}
+            }
+          ],
+          "output": {
+            "kind": "ref",
+            "ref": "Node",
+            "fields": []
+          },
+          "errors": [
+            400,
+            409
+          ],
+          "stream": "none",
+          "options": {}
+        },
+        {
+          "id": "oq2wrn5",
+          "name": "Get",
+          "http": "",
+          "desc": "读取节点",
+          "note": "",
+          "example": "",
+          "input": [
+            {
+              "id": "mhhp23v",
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "in": "path",
+              "desc": "节点 id",
+              "enum": [],
+              "itemsType": "string",
+              "itemsRef": "",
+              "ref": "",
+              "mapValueType": "string",
+              "mapValueRef": "",
+              "tag": 0,
+              "oneof": "",
+              "options": {}
+            }
+          ],
+          "output": {
+            "kind": "ref",
+            "ref": "Node",
+            "fields": []
+          },
+          "errors": [
+            404
+          ],
+          "stream": "none",
+          "options": {}
+        },
+        {
+          "id": "o33v3bq",
+          "name": "List",
+          "http": "",
+          "desc": "列出节点",
+          "note": "",
+          "example": "",
+          "input": [
+            {
+              "id": "9qy8q7x",
+              "name": "pageSize",
+              "type": "int",
+              "required": false,
+              "in": "query",
+              "desc": "每页数量",
+              "enum": [],
+              "itemsType": "string",
+              "itemsRef": "",
+              "ref": "",
+              "mapValueType": "string",
+              "mapValueRef": "",
+              "tag": 0,
+              "oneof": "",
+              "options": {}
+            },
+            {
+              "id": "l675q82",
+              "name": "pageToken",
+              "type": "string",
+              "required": false,
+              "in": "query",
+              "desc": "分页游标",
+              "enum": [],
+              "itemsType": "string",
+              "itemsRef": "",
+              "ref": "",
+              "mapValueType": "string",
+              "mapValueRef": "",
+              "tag": 0,
+              "oneof": "",
+              "options": {}
+            }
+          ],
+          "output": {
+            "kind": "inline",
+            "ref": "",
+            "fields": [
+              {
+                "id": "kd8ifyx",
+                "name": "nodes",
+                "type": "array",
+                "required": false,
+                "in": "body",
+                "desc": "节点列表",
+                "enum": [],
+                "itemsType": "ref",
+                "itemsRef": "Node",
+                "ref": "",
+                "mapValueType": "string",
+                "mapValueRef": "",
+                "tag": 0,
+                "oneof": "",
+                "options": {}
+              },
+              {
+                "id": "fd6d2ut",
+                "name": "nextPageToken",
+                "type": "string",
+                "required": false,
+                "in": "body",
+                "desc": "下一页游标",
+                "enum": [],
+                "itemsType": "string",
+                "itemsRef": "",
+                "ref": "",
+                "mapValueType": "string",
+                "mapValueRef": "",
+                "tag": 0,
+                "oneof": "",
+                "options": {}
+              }
+            ]
+          },
+          "errors": [],
+          "stream": "none",
+          "options": {}
+        },
+        {
+          "id": "1t7soc1",
+          "name": "Update",
+          "http": "",
+          "desc": "更新节点",
+          "note": "",
+          "example": "",
+          "input": [
+            {
+              "id": "hlcn8is",
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "in": "path",
+              "desc": "节点 id",
+              "enum": [],
+              "itemsType": "string",
+              "itemsRef": "",
+              "ref": "",
+              "mapValueType": "string",
+              "mapValueRef": "",
+              "tag": 0,
+              "oneof": "",
+              "options": {}
+            },
+            {
+              "id": "sx7md5w",
+              "name": "name",
+              "type": "string",
+              "required": false,
+              "in": "body",
+              "desc": "新名称",
+              "enum": [],
+              "itemsType": "string",
+              "itemsRef": "",
+              "ref": "",
+              "mapValueType": "string",
+              "mapValueRef": "",
+              "tag": 0,
+              "oneof": "",
+              "options": {}
+            }
+          ],
+          "output": {
+            "kind": "ref",
+            "ref": "Node",
+            "fields": []
+          },
+          "errors": [
+            404,
+            409
+          ],
+          "stream": "none",
+          "options": {}
+        },
+        {
+          "id": "gcpywzo",
+          "name": "Delete",
+          "http": "",
+          "desc": "删除节点",
+          "note": "",
+          "example": "",
+          "input": [
+            {
+              "id": "m3kp18s",
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "in": "path",
+              "desc": "节点 id",
+              "enum": [],
+              "itemsType": "string",
+              "itemsRef": "",
+              "ref": "",
+              "mapValueType": "string",
+              "mapValueRef": "",
+              "tag": 0,
+              "oneof": "",
+              "options": {}
+            }
+          ],
+          "output": {
+            "kind": "void",
+            "ref": "",
+            "fields": []
+          },
+          "errors": [
+            404
+          ],
+          "stream": "none",
+          "options": {}
+        }
+      ]
+    }
+  ],
+  "models": [
+    {
+      "id": "afz39zu",
+      "name": "Node",
+      "desc": "节点",
+      "fields": [
+        {
+          "id": "culwwgf",
+          "name": "id",
+          "type": "string",
+          "required": false,
+          "in": "body",
+          "desc": "节点 id",
+          "enum": [],
+          "itemsType": "string",
+          "itemsRef": "",
+          "ref": "",
+          "mapValueType": "string",
+          "mapValueRef": "",
+          "tag": 0,
+          "oneof": "",
+          "options": {}
+        },
+        {
+          "id": "wc9ll9g",
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "in": "body",
+          "desc": "名称",
+          "enum": [],
+          "itemsType": "string",
+          "itemsRef": "",
+          "ref": "",
+          "mapValueType": "string",
+          "mapValueRef": "",
+          "tag": 0,
+          "oneof": "",
+          "options": {}
+        },
+        {
+          "id": "8s233m8",
+          "name": "status",
+          "type": "enum",
+          "required": false,
+          "in": "body",
+          "desc": "状态",
+          "enum": [
+            "draft",
+            "published"
+          ],
+          "itemsType": "string",
+          "itemsRef": "",
+          "ref": "",
+          "mapValueType": "string",
+          "mapValueRef": "",
+          "tag": 0,
+          "oneof": "",
+          "options": {}
+        },
+        {
+          "id": "y4n1tbx",
+          "name": "createdAt",
+          "type": "timestamp",
+          "required": false,
+          "in": "body",
+          "desc": "创建时间",
+          "enum": [],
+          "itemsType": "string",
+          "itemsRef": "",
+          "ref": "",
+          "mapValueType": "string",
+          "mapValueRef": "",
+          "tag": 0,
+          "oneof": "",
+          "options": {}
+        }
+      ],
+      "reserved": {
+        "numbers": [],
+        "names": []
+      },
+      "options": {}
+    }
+  ]
+}
