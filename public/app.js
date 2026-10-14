@@ -538,10 +538,54 @@ function select(kind, id) {
   renderForm();
 }
 function openProjectInfo() { sel = { kind: null, id: null }; renderTree(); renderForm(); }
+function openNewProject() {
+  if (confirm('新建项目将清空当前所有数据并回到 Node 示例，确认？')) {
+    project = defaultProject();
+    sel = { kind: null, id: null };
+    refreshDerived(); renderTree(); renderForm();
+    addLog('info', '新建项目（Node 示例）', ['已清空当前数据，回到默认示例，按 Ctrl+S 保存']);
+    saveStatus('已新建 Node 示例项目（未保存）');
+  }
+}
+function exportProject() {
+  const root = toYamlSource(); root.idlstudio = '0.3';
+  const text = window.jsyaml.dump(root, { lineWidth: 120 });
+  const name = (project.name || 'project').replace(/[^\w.-]+/g, '_');
+  const ver = project.version || '1.0.0';
+  downloadText(text, name + '-v' + ver + '.idl.yaml', 'text/yaml');
+  saveStatus('已导出项目 IDL');
+}
+function downloadText(text, filename, mime) {
+  const blob = new Blob([text], { type: mime || 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+function importIdlFile(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const root = window.jsyaml.load(String(r.result || ''));
+      const p = parseYamlToProject(root || {});
+      if (confirm('导入 IDL 将覆盖当前项目（未保存改动将丢失），确认？')) {
+        project = p; sel = { kind: null, id: null };
+        refreshDerived(); renderTree(); renderForm();
+        const nM = p.resources.reduce((a, x) => a + x.methods.length, 0);
+        addLog('info', '导入 IDL 成功：' + (p.name || '') + ' v' + (p.version || ''), ['资源 ' + p.resources.length + ' · 模型 ' + p.models.length + ' · 方法 ' + nM]);
+        saveStatus('已导入 IDL 项目');
+      }
+    } catch (e) {
+      addLog('error', '导入 IDL 失败', [e.message]);
+      saveStatus('导入失败：' + e.message);
+    }
+  };
+  r.readAsText(file);
+}
 function renderForm() {
   const head = $('formHead'), body = $('formBody');
   head.innerHTML = ''; body.innerHTML = '';
-  if ($('projBtn')) $('projBtn').classList.toggle('active', !sel.kind);
   if ($('specBadge')) $('specBadge').classList.toggle('active', !sel.kind);
   let title = '', tag = '', desc = '';
   if (sel.kind === 'resource') {
@@ -1058,8 +1102,11 @@ function doImport() {
 async function init() {
   $('saveBtn').onclick = saveProject;
   $('loadBtn').onclick = loadProject;
-  $('projBtn').onclick = openProjectInfo;
+  $('projBtn').onclick = openNewProject;
   $('specBadge').onclick = openProjectInfo;
+  $('exportBtn').onclick = exportProject;
+  $('importIdlBtn').onclick = () => $('importIdlInput').click();
+  $('importIdlInput').onchange = (e) => { const f = e.target.files && e.target.files[0]; if (f) importIdlFile(f); e.target.value = ''; };
   $('addResourceBtn').onclick = addResource;
   $('addModelBtn').onclick = addModel;
   $('importBtn').onclick = openImport;
