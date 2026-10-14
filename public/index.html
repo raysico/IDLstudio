@@ -13,6 +13,7 @@
     <span class="title">IDL Service Design Studio</span>
     <button id="specBadge" class="badge capsule" title="点击管理项目信息（服务名、版本、描述、imports、options）">项目</button>
     <button id="themeToggle" class="btn theme-btn" title="切换 浅色 / 暗夜 模式">浅色</button>
+    <button id="shortcutBtn" class="btn theme-btn" title="快捷键面板">快捷键</button>
   </div>
   <div class="meta">
     <span id="saveStatus" class="buf-status"></span>
@@ -93,6 +94,14 @@
 </main>
 
 <footer id="footbar">Powered by hoxiudimdim</footer>
+
+<!-- 快捷键面板 -->
+<div id="shortcutModal" class="modal-overlay" hidden>
+  <div class="modal modal-sm">
+    <div class="modal-head"><span class="ftitle">快捷键</span><button id="scClose" class="btn" title="关闭">×</button></div>
+    <div class="modal-body" id="scBody"></div>
+  </div>
+</div>
 
 <!-- 导入 OpenAPI 弹窗 -->
 <div id="importModal" class="modal-overlay" hidden>

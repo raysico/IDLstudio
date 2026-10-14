@@ -1,5 +1,12 @@
 # 更新记录 (Changelog)
 
+## 0.4.0 (2026-10-14)
+- **快捷键系统**：中央键位表 + `bindShortcuts()`；保存 `Cmd/Ctrl+S`、导出 .didl `Cmd/Ctrl+Shift+S`、载入 `Cmd/Ctrl+L`、新增资源/模型/字段/方法 `Cmd/Ctrl+Shift+R/M/F/E`、调试台聚焦 `Cmd/Ctrl+Alt+F`、模拟发送 `Cmd/Ctrl+Alt+T`；顶栏「快捷键」按钮弹出面板。
+- **失焦自动保存**：任一输入框失焦即保存；顶栏「保存」改为「导出项目」。
+- **导出格式**：后缀 `.idl.yaml` → `.didl`；「导入 IDL」→「导入dIDL」。
+- **改名**：项目名 `IDLstudio` → `IDL Service Design Studio`；底部新增 `Powered by hoxiudimdim` 页脚。
+- **新增 ROADMAP.md**（更无损路线）；移除涉敏测试数据并 `.gitignore` 防护。
+
 ## 0.3.0 (2026-10-14)
 - **阶段二：oneof + stream**：字段行 oneof 组名（同组互斥，proto `oneof 块` / OpenAPI `oneOf`）；方法流类型 `none/server/client/bidi`（proto `stream Xxx` / OpenAPI `x-streaming`）；导入反向映射 `x-streaming`→stream、schema `oneOf`→合成 oneof 模型。
 - **阶段三：options 兜底袋**：项目 / 模型 / 字段 / 方法四层 JSON 录入；proto 原样回写（文件级 `option`、message 级 `option`、字段 `[ k = v ]`、method `{ option }`）；OpenAPI 按方向性忽略。

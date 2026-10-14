@@ -223,6 +223,14 @@ body.dark ::-webkit-scrollbar-thumb:hover { background: #4a5365; border: 2px sol
 
 .modal-overlay[hidden] { display: none !important; }
 
+/* —— 快捷键面板 —— */
+.modal.modal-sm { width: min(460px, 92vw); }
+.sc-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 2px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.sc-row:last-child { border-bottom: none; }
+.sc-label { color: var(--text); }
+.sc-label small { color: var(--muted); }
+.sc-keys { font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--accent); white-space: nowrap; }
+
 /* —— 日志面板 —— */
 #logView { overflow: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
 .log-entry { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; }

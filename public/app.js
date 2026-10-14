@@ -1099,6 +1099,68 @@ function doImport() {
   }
 }
 
+// ---------- 快捷键（中央键位表 + 绑定 + 面板） ----------
+const SHORTCUTS = [
+  { label: '保存', keys: 'Cmd/Ctrl+S', run: () => saveProject() },
+  { label: '导出项目（.didl）', keys: 'Cmd/Ctrl+Shift+S', run: () => exportProject() },
+  { label: '载入 project.json', keys: 'Cmd/Ctrl+L', run: () => loadProject() },
+  { label: '新增资源', keys: 'Cmd/Ctrl+Shift+R', run: () => newGuard(addResource) },
+  { label: '新增模型', keys: 'Cmd/Ctrl+Shift+M', run: () => newGuard(addModel) },
+  { label: '新增字段（需选中模型）', keys: 'Cmd/Ctrl+Shift+F', run: addFieldShortcut },
+  { label: '新增方法（需选中资源）', keys: 'Cmd/Ctrl+Shift+E', run: addMethodShortcut },
+  { label: '聚焦 / 查找（调试台）', keys: 'Cmd/Ctrl+Alt+F', debug: true, run: focusFind },
+  { label: '模拟发送（调试台）', keys: 'Cmd/Ctrl+Alt+T', debug: true, run: mockSend },
+];
+function newGuard(fn) {
+  if (activeTab === 'debug') { saveStatus('当前为调试台模式，请切回编辑标签后操作'); return; }
+  fn();
+}
+function addFieldShortcut() {
+  if (activeTab === 'debug') { saveStatus('当前为调试台模式，请切回编辑标签后操作'); return; }
+  if (!sel || sel.kind !== 'model' || !findModel(sel.id)) { saveStatus('未选中模型'); return; }
+  findModel(sel.id).fields.push(newField()); refreshDerived(); renderForm();
+}
+function addMethodShortcut() {
+  if (activeTab === 'debug') { saveStatus('当前为调试台模式，请切回编辑标签后操作'); return; }
+  const r = sel && sel.kind === 'resource' ? findRes(sel.id) : null;
+  if (!r) { saveStatus('未选中资源'); return; }
+  r.methods.push(newMethod()); refreshDerived(); renderForm(); renderTree();
+}
+function focusFind() {
+  const el = $('dbgFind'); if (el) { el.focus(); el.select(); return; }
+  saveStatus('调试台暂无方法，请先选择方法');
+}
+function mockSend() {
+  const el = $('dbgSend'); if (el) { el.click(); return; }
+  saveStatus('调试台暂无方法，请先选择方法');
+}
+function renderShortcuts() {
+  const body = $('scBody'); if (!body) return;
+  body.innerHTML = SHORTCUTS.map((s) =>
+    '<div class="sc-row"><span class="sc-label">' + esc(s.label) + (s.debug ? ' <small>(调试台)</small>' : '') + '</span><code class="sc-keys">' + esc(s.keys) + '</code></div>'
+  ).join('');
+}
+function bindShortcuts() {
+  window.addEventListener('keydown', (e) => {
+    if (!(e.metaKey || e.ctrlKey)) return;
+    const k = e.key.toLowerCase();
+    const shift = e.shiftKey, alt = e.altKey;
+    const match = SHORTCUTS.find((s) => {
+      const ks = s.keys.split('+');
+      return ks[ks.length - 1].toLowerCase() === k
+        && (ks.indexOf('Shift') > -1) === shift
+        && (ks.indexOf('Alt') > -1) === alt;
+    });
+    if (!match) return;
+    if (match.debug && activeTab !== 'debug') return;
+    e.preventDefault();
+    match.run();
+  });
+  $('shortcutBtn').onclick = () => { renderShortcuts(); $('shortcutModal').hidden = false; };
+  $('scClose').onclick = () => { $('shortcutModal').hidden = true; };
+  $('shortcutModal').addEventListener('click', (e) => { if (e.target === $('shortcutModal')) $('shortcutModal').hidden = true; });
+}
+
 async function init() {
   $('topExportBtn').onclick = exportProject;
   $('loadBtn').onclick = loadProject;
@@ -1122,14 +1184,12 @@ async function init() {
   };
   $('filter').oninput = renderTree;
   $('sourceInput').addEventListener('input', onSourceEdit);
-  window.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); saveProject(); }
-  });
   // 任意输入框失焦即自动保存当前修改
   document.addEventListener('focusout', (e) => {
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) saveProject();
   });
+  bindShortcuts();
   initTheme(); initResizer(); initTabs();
   logs = loadLogs();
   renderLog();
