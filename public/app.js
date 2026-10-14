@@ -979,6 +979,7 @@ function doImport() {
 async function init() {
   $('saveBtn').onclick = saveProject;
   $('loadBtn').onclick = loadProject;
+  $('projBtn').onclick = () => { sel = { kind: null, id: null }; renderTree(); renderForm(); };
   $('addResourceBtn').onclick = addResource;
   $('addModelBtn').onclick = addModel;
   $('importBtn').onclick = openImport;
