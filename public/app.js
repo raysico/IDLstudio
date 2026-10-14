@@ -1100,7 +1100,7 @@ function doImport() {
 }
 
 async function init() {
-  $('saveBtn').onclick = saveProject;
+  $('topExportBtn').onclick = exportProject;
   $('loadBtn').onclick = loadProject;
   $('projBtn').onclick = openNewProject;
   $('specBadge').onclick = openProjectInfo;
@@ -1124,6 +1124,11 @@ async function init() {
   $('sourceInput').addEventListener('input', onSourceEdit);
   window.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); saveProject(); }
+  });
+  // 任意输入框失焦即自动保存当前修改
+  document.addEventListener('focusout', (e) => {
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) saveProject();
   });
   initTheme(); initResizer(); initTabs();
   logs = loadLogs();
