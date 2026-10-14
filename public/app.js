@@ -859,8 +859,8 @@ function renderDebugForm() {
   db.innerHTML =
     '<div class="group-label">输入</div><div id="dbgin"></div>' +
     '<div class="row wrap"><label class="fld sm"><span>模拟错误码</span><select id="dbgErr"><option value="">(无，返回 200)</option>' + m.errors.map((c) => '<option value="' + c + '">' + c + '</option>').join('') + '</select></label>' +
-    '<button class="btn primary" id="dbgSend">发送</button></div>' +
-    '<div class="resp-head"><span id="dbgStatus" class="status">—</span><span id="dbgMeta" class="meta"></span><span class="resp-head-spacer"></span><div class="findbar"><span class="find-label">查找</span><input id="dbgFind" type="text" placeholder="关键词/正则"><button class="btn" id="dbgNext">↓</button><span id="dbgCount" class="find-count">0 / 0</span><button class="btn" id="dbgClear">×</button></div></div>' +
+    '<button class="btn primary" id="dbgSend">发送<span class="keyhint">' + keycaps(['ctrl', 'alt'], 'T') + '</span></button></div>' +
+    '<div class="resp-head"><span id="dbgStatus" class="status">—</span><span id="dbgMeta" class="meta"></span><span class="resp-head-spacer"></span><div class="findbar"><span class="find-label">查找</span><span class="keyhint">' + keycaps(['ctrl', 'alt'], 'F') + '</span><input id="dbgFind" type="text" placeholder="关键词/正则"><button class="btn" id="dbgNext">↓</button><span id="dbgCount" class="find-count">0 / 0</span><button class="btn" id="dbgClear">×</button></div></div>' +
     '<div id="dbgResp" class="resp-body"><div class="placeholder">点击「发送」查看 mock 响应。</div></div>';
   const inp = $('dbgin');
   for (const f of m.input) {
@@ -1132,14 +1132,18 @@ function newGuard(fn) {
 }
 // 顶栏「＋资源 / ＋模型」与左面板分组头旁的快捷键键帽提示（平台自适应：mac=⌘，win=⌃）
 function kcap(g) { return '<kbd class="kc">' + g + '</kbd>'; }
-function keycapHint(letter) {
+function keycaps(mods, letter) {
   const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || '');
-  const M = isMac ? '⌘' : '⌃'; // Cmd(mac) / Ctrl(win)
-  return kcap(M) + kcap('⇧') + kcap(letter);
+  const glyph = { ctrl: isMac ? '⌘' : '⌃', shift: '⇧', alt: isMac ? '⌥' : 'Alt' };
+  return mods.map((m) => kcap(glyph[m])).join('') + kcap(letter);
 }
+function keycapHint(letter) { return keycaps(['ctrl', 'shift'], letter); }
 function renderKeyHints() {
-  const h = $('resKh'); if (h) h.innerHTML = keycapHint('R');
-  const m = $('modelKh'); if (m) m.innerHTML = keycapHint('M');
+  const set = (id, mods, letter) => { const el = $(id); if (el) el.innerHTML = keycaps(mods, letter); };
+  set('resKh', ['ctrl', 'shift'], 'R');
+  set('modelKh', ['ctrl', 'shift'], 'M');
+  set('expKh', ['ctrl', 'shift'], 'S');
+  set('loadKh', ['ctrl'], 'L');
 }
 function addFieldShortcut() {
   if (activeTab === 'debug') { saveStatus('当前为调试台模式，请切回编辑标签后操作'); return; }

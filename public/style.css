@@ -246,6 +246,7 @@ body.dark ::-webkit-scrollbar-thumb:hover { background: #4a5365; border: 2px sol
 .meta .btn.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); color: var(--accent); }
 .keyhint { display: inline-flex; gap: 2px; margin-left: 2px; align-items: center; }
 .kc { font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 10px; line-height: 1; padding: 2px 4px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); background: var(--card); }
+#dbgSend { align-self: flex-end; } /* 与「模拟错误码」选择框对齐 */
 
 .field-row .foneof { border-left: 2px solid var(--accent); }
 
