@@ -39,7 +39,8 @@ code, pre, textarea, input { font-family: 'SF Mono', ui-monospace, Menlo, Consol
 .buf-status { font-size: 11px; color: #9aa7b8; min-height: 14px; }
 
 /* layout */
-#layout { display: flex; height: calc(100vh - 48px); }
+#layout { display: flex; height: calc(100vh - 48px - 24px); }
+#footbar { height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--accent); user-select: none; }
 #sidebar {
   width: 300px; min-width: 240px; border-right: 1px solid var(--line);
   background: #fbfcfd; display: flex; flex-direction: column; overflow: hidden;
