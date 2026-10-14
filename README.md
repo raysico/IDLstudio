@@ -9,19 +9,49 @@
 
 产物AI友好,方便无基础用户设计完毕直接交付给AI进行编程减少沟通成本;
 
+支持导入 OpenAPI 3.x 反解续写，以及导出 / 导入 `.idl.yaml` 跨设备还原继续编辑。
+
 轻量、零构建、纯浏览器交互（仅服务端做本地持久化）。自带浅色 / 暗夜双主题。
+
+## 使用场景
+
+- **契约优先 / API 先行**：开发前先用表单敲定 API 契约（接口、字段、状态码、预期返回），前后端据此各自实现，减少沟通与返工
+- **前端先行对接**：无需等后端，直接为各状态设计预期返回示例，前端按示例先联调
+- **交付 AI 编程**：设计完一键导出 OpenAPI / proto 契约，作为输入直接交给 AI 生成代码，降低沟通成本
+- **既有 API 迁移续写**：已有 OpenAPI 3.x 项目，导入反解回 IDL 表单继续编辑、扩展新接口
+- **双形态覆盖**：一份 IDL 同时编译出 REST（OpenAPI 3.1）与 RPC（protobuf/gRPC），一套定义覆盖多种客户端
+- **跨设备协作**：把全部 IDL + 备注导出为 `.idl.yaml`，换设备 / 环境导入即还原继续编辑
+- **契约沉淀与评审**：设计结果作为契约文档沉淀、供团队评审与归档
 
 ## 特性
 
-- **表单设计**：资源 / 方法 / 模型树，字段类型含 `string · int · number · bool · timestamp · enum · array · ref · map`，`in: body · path · query · header`，必填 / 枚举 / 描述一应俱全
+**契约设计**
+- **表单设计**：资源 / 方法 / 模型树；字段类型 `string · int · number · bool · timestamp · enum · array · ref · map`，位置 `body · path · query · header`，必填 / 枚举 / 描述一应俱全
 - **双向同步**：表单改动实时回写 YAML 源码并重算两套预览；也可直接手写 YAML 源码，停顿自动解析回填表单
-- **双生成器**：标准方法默认路由（Create→POST /复数、Get→GET /{id}、List→GET、Update→PATCH、Delete→DELETE，`http` 可自定义覆盖）
-  - **OpenAPI 3.1**：schemas / `$ref` / enum / `date-time` / 数组 / map / 内联输出，200 响应可带 `example`
-  - **protobuf / gRPC**：`proto3`、`package`、每资源一个 `XxxService`、`<Res><Method>Request`、枚举 `<消息><字段>Value`、`Timestamp` / `Empty`
-- **备注与示例**：每个方法可写备注说明（输出为 OpenAPI `x-note` / proto 注释）与预期正常返回示例（200，输出为 `example`，调试台直接使用）
-- **mock 调试台**：选方法 → 示例参数 → 选错误码或 200 → 返回模拟响应；响应支持查找（正则、上一个 / 下一个、高亮）
-- **持久化**：项目保存到本地 `project.json`；`Ctrl/Cmd + S` 快速保存
-- 浅色 / 暗夜双主题
+- **备注与预期示例**：方法级备注说明（输出为 OpenAPI `x-note` / proto 注释）与预期正常返回示例（→ 200 `example`，调试台直接使用）
+
+**双生成器（一份 IDL → 两套契约）**
+- **OpenAPI 3.1**：schemas / `$ref` / enum / `date-time` / 数组 / map / 内联输出，200 响应可带 `example`
+- **protobuf / gRPC**：`proto3`、`package`、每资源一个 `XxxService`、`<Res><Method>Request`、枚举、`Timestamp` / `Empty`
+
+**导入续写**
+- **导入 OpenAPI**：粘贴或选文件导入 OpenAPI 3.x（yaml / json），反解回 IDL 表单继续编辑
+- **导出项目 / 导入 IDL**：把全部 IDL + 备注打包为 `.idl.yaml` 导出，跨设备 / 环境导入还原继续编辑
+
+**proto 无损属性**
+- `tag` 字段编号（自动避让 `reserved` 紧凑补号）、`imports` 项目级依赖、`reserved` 编号 / 名称区间
+- `oneof` 互斥字段组 + 方法流类型 `none / server / client / bidi`
+- `options` 兜底袋：项目 / 模型 / 字段 / 方法四层 JSON 录入，proto 原样回写
+
+**项目与调试**
+- **项目信息**：服务名 / 版本 / 描述 / imports，标题栏项目名胶囊随时管理
+- **新建项目**：一键清空回默认示例
+- **mock 调试台**：选方法 → 示例参数 → 选错误码或 200 → 模拟响应；响应支持查找（正则、上一个 / 下一个、高亮）
+- **日志标签页**：集中展示导入错误报告与丢失记录（本地持久化，可清空）
+
+**运行**
+- 持久化到本地 `project.json`；`Ctrl/Cmd + S` 快速保存
+- 轻量、零构建、纯浏览器交互（仅服务端做本地持久化），浅色 / 暗夜双主题
 
 ## 快速开始
 
@@ -40,8 +70,9 @@ npm start
 ## 用法
 
 1. 左侧树选中 **资源 / 方法 / 模型**，中间表单编辑；
-2. 右侧四个标签页实时查看 **IDL 源码 / OpenAPI / proto / 调试台**；
-3. 顶部「保存」或 `Ctrl/Cmd+S` 持久化到 `project.json`。
+2. 右侧五个标签页实时查看 **IDL 源码 / OpenAPI / proto / 调试台 / 日志**；
+3. 顶部可 **导入OpenAPI** 续写、「**导入IDL / 导出项目**」跨设备迁移、「**新建项目**」一键清空；
+4. 顶部「保存」或 `Ctrl/Cmd+S` 持久化到 `project.json`。
 
 IDL 语法与 OpenAPI / proto 的完整映射规则见 **[DESIGN.md](DESIGN.md)**。
 
@@ -52,12 +83,14 @@ IDLstudio/
 ├── server.js          # 本地服务：静态页 + /api/project 持久化 + 提供浏览器版 js-yaml
 ├── package.json
 ├── DESIGN.md          # 设计文档（IDL 语法 + 双生成映射 + 调试台 + 限制）
+├── CHANGELOG.md       # 更新记录
 ├── project.json       # 示例项目（可修改；保存时更新）
 ├── LICENSE
 └── public/
     ├── index.html
     ├── style.css      # 浅/暗双主题
-    └── app.js         # IDL 模型、表单、双向同步、双生成器、调试台、查找
+    ├── app.js         # IDL 模型、表单、双向同步、双生成器、调试台、查找
+    └── importer.js    # OpenAPI 3.x → IDL 导入器
 ```
 
 ## 工作原理
