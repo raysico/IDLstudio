@@ -1,0 +1,42 @@
+{
+  "name": "CollisionTest",
+  "version": "1.0.0",
+  "description": "标识符冲突测试项目：字段 snake 归一重名 + 枚举值归一重名",
+  "imports": [],
+  "options": {},
+  "resources": [
+    {
+      "name": "Ping",
+      "methods": [
+        {
+          "name": "GetPing",
+          "note": "",
+          "stream": "none",
+          "options": {},
+          "input": [],
+          "output": { "kind": "empty" }
+        }
+      ]
+    }
+  ],
+  "models": [
+    {
+      "name": "Sample",
+      "reserved": { "numbers": [], "names": [] },
+      "options": {},
+      "fields": [
+        { "name": "message", "type": "string", "tag": 0, "options": {} },
+        { "name": "Message", "type": "int", "tag": 0, "options": {} },
+        { "name": "kind", "type": "string", "tag": 0, "options": {} },
+        { "name": "Kind", "type": "bool", "tag": 0, "options": {} },
+        {
+          "name": "status",
+          "type": "enum",
+          "tag": 0,
+          "options": {},
+          "enum": ["1st-value", "1st value", "1ST_VALUE", "Unspecified", "OK"]
+        }
+      ]
+    }
+  ]
+}

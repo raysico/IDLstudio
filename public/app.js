@@ -390,14 +390,23 @@ function fmtReservedNumbers(nums) {
 function messageText(name, fields, reserved, options) {
   const lines = ['message ' + name + ' {'];
   const used = new Set();
+  const usedNames = new Set(); // 字段名去重：snake 归一后防重名（如 message / Message → message）
   const resvNums = (reserved && reserved.numbers) || [];
   const groups = {};
   const emitField = (f, indent) => {
     let n = (f.tag > 0) ? f.tag : 0;
     if (n <= 0) { do { n++; } while (used.has(n) || resvNums.includes(n)); }
     used.add(n);
+    let fn = snake(f.name);
+    if (usedNames.has(fn)) {
+      const orig = fn; let k = 2;
+      while (usedNames.has(orig + '_' + k)) k++;
+      fn = orig + '_' + k;
+      protoCollisionWarn('字段名冲突：message ' + name + ' 内字段 "' + f.name + '" 归一为 "' + orig + '" 已占用，已避让为 "' + fn + '"');
+    }
+    usedNames.add(fn);
     const opts = optNonEmpty(f.options) ? ' [' + protoOptionsInline(f.options) + ']' : '';
-    lines.push(indent + protoType(f, name) + ' ' + snake(f.name) + ' = ' + n + opts + ';');
+    lines.push(indent + protoType(f, name) + ' ' + fn + ' = ' + n + opts + ';');
   };
   for (const f of fields) {
     if (!f.name) continue;
@@ -430,7 +439,19 @@ function toProto() {
     if (seenEnums[nm] || !f.enum || !f.enum.length) return;
     seenEnums[nm] = true;
     const lines = ['enum ' + nm + ' {', '  ' + nm + '_UNSPECIFIED = 0;'];
-    f.enum.forEach((v, i) => lines.push('  ' + nm + '_' + snake(v).toUpperCase() + ' = ' + (i + 1) + ';'));
+    const constNames = new Set([nm + '_UNSPECIFIED']); // 常量名去重：归一后防重名，且避让自动 UNSPECIFIED
+    f.enum.forEach((v, i) => {
+      let base = nm + '_' + snake(v).toUpperCase();
+      let cn = base;
+      if (constNames.has(cn)) {
+        let k = 2;
+        while (constNames.has(base + '_' + k)) k++;
+        cn = base + '_' + k;
+        protoCollisionWarn('枚举常量冲突：enum ' + nm + ' 中值 "' + v + '" 归一为 "' + base + '" 已占用，已避让为 "' + cn + '"');
+      }
+      constNames.add(cn);
+      lines.push('  ' + cn + ' = ' + (i + 1) + ';');
+    });
     lines.push('}');
     enumBlocks.push(lines.join('\n'));
   }
@@ -1069,6 +1090,7 @@ function addLog(type, title, lines) {
   persistLogs();
   if (activeTab === 'log') renderLog();
 }
+function protoCollisionWarn(msg) { addLog('warn', msg); } // proto 标识符冲突：记录到「日志」标签页
 function renderLog() {
   const el = $('logView'); if (!el) return;
   if (!logs || !logs.length) { el.innerHTML = '<div class="placeholder">暂无日志。导入 OpenAPI 产生的错误报告与丢失记录会显示在这里。</div>'; return; }
