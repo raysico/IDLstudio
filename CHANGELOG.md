@@ -1,5 +1,13 @@
 # 更新记录 (Changelog)
 
+## 0.3.0 (2026-10-14)
+- **阶段二：oneof + stream**：字段行 oneof 组名（同组互斥，proto `oneof 块` / OpenAPI `oneOf`）；方法流类型 `none/server/client/bidi`（proto `stream Xxx` / OpenAPI `x-streaming`）；导入反向映射 `x-streaming`→stream、schema `oneOf`→合成 oneof 模型。
+- **阶段三：options 兜底袋**：项目 / 模型 / 字段 / 方法四层 JSON 录入；proto 原样回写（文件级 `option`、message 级 `option`、字段 `[ k = v ]`、method `{ option }`）；OpenAPI 按方向性忽略。
+- **项目信息**：项目面板新增「描述」字段（YAML / OpenAPI `info.description` 往返、导入器映射）；标题栏项目名胶囊可点击管理项目信息。
+- **新建项目**：原「项目信息」按钮改为「新建项目」（确认弹窗，清空回 Node 示例）。
+- **导出 / 导入 IDL**：IDL 源码 tab「导出项目」下载全部 IDL + 备注（`.idl.yaml`，跨设备还原）；顶栏「导入 IDL」还原续写。
+- **入口调整**：「导入」更名「导入OpenAPI」；「导入 IDL」移至顶栏（＋模型 与 导入 之间）；IDL 源码工具栏按钮成组右对齐、两端对齐。
+
 ## 0.2.0 (2026-10-14)
 - **导入续写（阶段一）**：新增 OpenAPI 3.x yaml/json 导入，反解回 IDL 后可在表单续写（`public/importer.js` + 顶部「导入」入口）。
 - **proto 无损属性**：IDL 新增 `tag`（字段编号）、`imports`（项目）、`reserved`（模型，编号/名称）；proto 生成器发射字段编号、`import`、`reserved`（自动避让 reserved、支持 `2 to 11` 区间）。
