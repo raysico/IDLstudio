@@ -37,6 +37,7 @@ code, pre, textarea, input { font-family: 'SF Mono', ui-monospace, Menlo, Consol
 .btn.danger { background: #7f1d1d; border-color: #991b1b; }
 .btn.sm { padding: 2px 8px; font-size: 12px; }
 .buf-status { font-size: 11px; color: #9aa7b8; min-height: 14px; }
+#topbar .buf-status { width: 170px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 
 /* layout */
 #layout { display: flex; height: calc(100vh - 48px - 24px); }
