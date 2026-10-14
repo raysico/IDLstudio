@@ -9,3 +9,7 @@ node_modules/
 # 注：project.json 为示例项目，默认保留并提交；
 # 如不希望跟踪你的本地改动，可取消下面注释：
 # project.json
+
+# 打包产物（Bun compile 编译指南）
+dist/
+assets.generated.js
