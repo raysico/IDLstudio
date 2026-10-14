@@ -13,6 +13,7 @@ const PUBLIC = path.join(ROOT, 'public');
 const HOST = '127.0.0.1';
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8010;
 const PROJECT_FILE = path.join(ROOT, 'project.json');
+const PKG = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')); // 唯一版本源
 
 function readProject() {
   if (!fs.existsSync(PROJECT_FILE)) return null;
@@ -53,7 +54,7 @@ function sendJSON(res, status, obj) {
 }
 
 function start() {
-  console.log('IDL Service Design Studio（IDL -> OpenAPI / protobuf）');
+  console.log('IDL Service Design Studio v' + (PKG.version || '0.0.0') + '（IDL -> OpenAPI / protobuf）');
   console.log('  打开     : http://' + HOST + ':' + PORT);
 
   const server = http.createServer(async (req, res) => {
@@ -73,6 +74,9 @@ function start() {
       }
       if (pathname === '/api/health') {
         return sendJSON(res, 200, { ok: true });
+      }
+      if (pathname === '/api/version') {
+        return sendJSON(res, 200, { version: PKG.version || '0.0.0' });
       }
       // 提供 js-yaml 浏览器版给前端做 YAML 源码解析/序列化
       if (pathname === '/vendor/js-yaml.min.js') {

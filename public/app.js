@@ -20,6 +20,7 @@ const LOCATIONS = ['body', 'path', 'query', 'header'];
 const STD_METHODS = ['Get', 'List', 'Create', 'Update', 'Delete'];
 
 let project = null;
+let APP_VERSION = ''; // 来自 /api/version（package.json 单一版本源）
 let sel = { kind: null, id: null };
 let activeTab = 'source';
 let dark = false;
@@ -551,7 +552,8 @@ function openNewProject() {
   }
 }
 function exportProject() {
-  const root = toYamlSource(); root.idlstudio = '0.3';
+  const root = toYamlSource(); root.idlstudio = '0.3'; // 格式版本单独维护，与产品版本解耦
+  root.generator = 'idl-service-design-studio/' + (APP_VERSION || '1.0.0'); // 导出溯源
   const text = window.jsyaml.dump(root, { lineWidth: 120 });
   const name = (project.name || 'project').replace(/[^\w.-]+/g, '_');
   const ver = project.version || '1.0.0';
@@ -1222,6 +1224,11 @@ async function init() {
   bindShortcuts();
   renderKeyHints();
   initTheme(); initResizer(); initTabs();
+  // 读取产品版本（package.json 单一源）并落到页脚
+  try {
+    const v = await fetch('/api/version').then((r) => r.json());
+    if (v && v.version) { APP_VERSION = String(v.version); const el = $('appVer'); if (el) el.textContent = 'v' + APP_VERSION; }
+  } catch (e) {}
   logs = loadLogs();
   renderLog();
   $('logClear').onclick = () => { logs = []; persistLogs(); renderLog(); };
