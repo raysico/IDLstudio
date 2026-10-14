@@ -1,0 +1,15 @@
+# 镜像构建上下文排除项
+node_modules
+.git
+.gitignore
+.github
+project.json
+*.didl
+*.idl.yaml
+README.md
+DESIGN.md
+CHANGELOG.md
+ROADMAP.md
+Bun-compile编译指南.md
+Dockerfile
+docker-compose.yml

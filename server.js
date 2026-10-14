@@ -10,9 +10,9 @@ const { URL } = require('url');
 
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
-const HOST = '127.0.0.1';
+const HOST = process.env.HOST || '127.0.0.1'; // 容器内设 0.0.0.0 供端口映射；本地默认仅本机
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8010;
-const PROJECT_FILE = path.join(ROOT, 'project.json');
+const PROJECT_FILE = process.env.PROJECT_FILE || path.join(ROOT, 'project.json'); // 容器内指向卷 /app/data
 const PKG = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')); // 唯一版本源
 
 function readProject() {

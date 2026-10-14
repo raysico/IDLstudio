@@ -4,6 +4,7 @@
 - **首个稳定版**：三阶段无损能力（阶段一 OpenAPI 导入续写、阶段二 oneof/stream、阶段三 options 兜底袋）全部落地并验收。
 - **版本号机制**：引入 SemVer `主.次.修`；以 `package.json#version` 为**单一版本源**，服务端新增 `/api/version` 供 UI 读取；页脚显示 `Powered by hoxiudimdim · v1.0.0`。
 - **导出溯源**：导出 `.didl` 写入 `generator: idl-service-design-studio/1.0.0`；`idlstudio` 格式标记保持 `0.3` 独立维护（与产品版本解耦，保证导入兼容判断准确）。
+- **容器化**：新增 `Dockerfile`（`node:20-alpine`、命名卷 `/app/data`）+ `.dockerignore`；`HOST` / `PROJECT_FILE` 改为 env 可配（默认不变，容器内 `HOST=0.0.0.0` 支持 NAS 端口映射）；配套 `IDLstudioDockercompose` 仓库一键部署。
 - 汇总此前全部特性：快捷键系统（含键帽提示）、失焦自动保存、导出/导入 DIDL、项目信息/新建项目、日志标签页、双主题等（详见 0.4.0 及以下）。
 
 ## 0.4.0 (2026-10-14)
