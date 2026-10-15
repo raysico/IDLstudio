@@ -63,14 +63,14 @@
 
 ## 快速开始
 
-需要 Node.js ≥ 16。
+需要 Node.js ≥ 16。**无需 `npm install`** —— 浏览器端 js-yaml 已 vendor 进 `public/vendor/`，克隆后直接运行：
 
 ```bash
-npm install
 npm start
 ```
 
-打开 <http://127.0.0.1:8010>。
+> 仅当你需要修改依赖（如升级 js-yaml）时才执行 `npm install`。
+> 打开 <http://127.0.0.1:8010>。
 
 > 端口：默认 `8010`，被占用时可用 `PORT=8011 npm start` 换端口。
 > 服务仅绑定 `127.0.0.1`，不对外网开放。
