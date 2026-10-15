@@ -4,9 +4,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# 依赖锁定，可复现构建（js-yaml）
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+# js-yaml 已 vendor 进 public/vendor，运行时无需 npm install；
+# 仅保留 package.json 供 server.js 读取版本号（单一版本源）
+COPY package.json ./
 
 # 应用代码（无编译，单阶段即可）
 COPY server.js ./

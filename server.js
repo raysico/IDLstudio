@@ -78,14 +78,7 @@ function start() {
       if (pathname === '/api/version') {
         return sendJSON(res, 200, { version: PKG.version || '0.0.0' });
       }
-      // 提供 js-yaml 浏览器版给前端做 YAML 源码解析/序列化
-      if (pathname === '/vendor/js-yaml.min.js') {
-        const yp = path.join(ROOT, 'node_modules', 'js-yaml', 'dist', 'js-yaml.min.js');
-        if (fs.existsSync(yp)) {
-          res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' });
-          return fs.createReadStream(yp).pipe(res);
-        }
-      }
+      // 浏览器版 js-yaml 已 vendor 进 public/vendor/，走下方静态文件分支（无需运行时 npm install）
 
       let filePath = pathname === '/' ? '/index.html' : pathname;
       filePath = path.normalize(filePath).replace(/^(\.\.[/\\])+/, '');

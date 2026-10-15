@@ -24,6 +24,8 @@ let APP_VERSION = ''; // 来自 /api/version（package.json 单一版本源）
 let sel = { kind: null, id: null };
 let activeTab = 'source';
 let dark = false;
+// js-yaml 已 vendor 进 public/vendor；若仍加载失败，给出明确提示而非误导性报错
+const JSYAML_OK = typeof window !== 'undefined' && window.jsyaml && typeof window.jsyaml.load === 'function' && typeof window.jsyaml.dump === 'function';
 
 // ---------- 内部模型 ----------
 function newField(o) {
@@ -833,6 +835,7 @@ function refreshDerived() {
 }
 function renderSource() {
   if (document.activeElement === $('sourceInput')) return; // 用户在源码里输入时不覆盖
+  if (!JSYAML_OK) { $('sourceInput').value = ''; return; } // js-yaml 未加载，源码 tab 留空（顶部有横幅提示）
   try { $('sourceInput').value = window.jsyaml.dump(toYamlSource(), { lineWidth: 120 }); }
   catch (e) { /* 忽略 */ }
 }
@@ -849,6 +852,7 @@ function sourceStatus(msg) {
 function onSourceEdit() {
   clearTimeout(onSourceEdit._t);
   onSourceEdit._t = setTimeout(() => {
+    if (!JSYAML_OK) { sourceStatus('js-yaml 未加载：源码编辑不可用（请检查部署）'); return; }
     const text = $('sourceInput').value;
     try {
       const root = window.jsyaml.load(text);
@@ -1300,6 +1304,12 @@ function bindShortcuts() {
 }
 
 async function init() {
+  // 前端守卫：js-yaml 未加载时持久横幅 + 禁用源码编辑（避免空白 tab / 误导性报错）
+  if (!JSYAML_OK) {
+    const w = $('vendorWarn'); if (w) w.hidden = false;
+    const si = $('sourceInput');
+    if (si) { si.disabled = true; si.placeholder = 'js-yaml 未加载，源码编辑不可用（请检查部署）'; }
+  }
   $('topExportBtn').onclick = exportProject;
   $('loadBtn').onclick = loadProject;
   $('projBtn').onclick = openNewProject;

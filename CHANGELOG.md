@@ -1,5 +1,12 @@
 # 更新记录 (Changelog)
 
+## 1.1.1 (2026-10-15)
+- **js-yaml vendor 进 `public/vendor/`，彻底消除对 node_modules 的运行时依赖**：
+  - 浏览器版 js-yaml 内嵌仓库（含 MIT 许可头），`server.js` 不再从 `node_modules` 读取 `/vendor/js-yaml.min.js`；**无需 `npm install` 即可运行**（沙箱 / 离线 / 下载即用）。
+  - `Dockerfile` 移除 `npm ci` 步骤（js-yaml 已 vendor），镜像更小、构建更快更稳（无网络依赖）。
+- **前端守卫（防误导性报错）**：js-yaml 若仍加载失败，顶部持久横幅提示「js-yaml 未加载：源码编辑 / 导入功能不可用」，并禁用源码编辑；不再把"缺库"误报成「YAML 语法错误：Cannot read properties of undefined」。
+- 修复历史遗留：js-yaml 缺失时 `/vendor/js-yaml.min.js` 返回 404、源码 tab 空白、粘贴 YAML 得到误导性报错。
+
 ## 1.1.0 (2026-10-15)
 - **语义提示词双端强化（产出恒 both）**：
   - OpenAPI：方法 `description` = desc + note（note 追加为独立段落），保留 `x-note` 无损副本；字段 desc → schema `description`（已有）。
