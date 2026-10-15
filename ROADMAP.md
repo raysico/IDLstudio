@@ -10,6 +10,7 @@
 - 导出 / 导入：OpenAPI 3.x → DIDL 续写；DIDL（.didl/.yaml/.json）跨设备还原
 - 导入仅支持 **OpenAPI**；**proto 反向导入未实现**
 - 已加固（1.0.1）：proto 标识符冲突——字段名 / 枚举常量 snake 归一后去重并数字后缀避让，冲突记入日志
+- 已实施（1.1.0）：**语义提示词双端强化**——OpenAPI `description`=desc+note、proto 全级注释（方法/字段/模型/资源）；**按产物自动检查**（复制/导出/导入触发 REST/RPC 体检，结果进日志页）；**主契约策略** `options.priority`（rest/rpc/both，随 .didl 携带）
 
 ### 已知有损点（需逐条收敛）
 

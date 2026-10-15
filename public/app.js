@@ -326,8 +326,10 @@ function toOpenAPI() {
           parameters.push({ name: f.name, in: f.in, required: !!f.required, schema: fieldSchema(f), description: f.desc || undefined });
         } else bodyFields.push(f);
       }
-      const op = { operationId: r.name + m.name, tags: [r.name], description: m.desc || undefined, parameters: parameters.length ? parameters : undefined };
-      if (m.note) op['x-note'] = m.note;
+      let opDesc = String(m.desc || '').trim();
+      if (m.note && String(m.note).trim()) opDesc = opDesc ? opDesc + '\n\n备注：' + String(m.note) : String(m.note);
+      const op = { operationId: r.name + m.name, tags: [r.name], description: opDesc || undefined, parameters: parameters.length ? parameters : undefined };
+      if (m.note) op['x-note'] = m.note; // 保留无损副本（机器可读场景），语义主通道走标准 description
       if (m.stream && m.stream !== 'none') op['x-streaming'] = m.stream;
       if (bodyFields.length) op.requestBody = { content: { 'application/json': { schema: objFromFields(bodyFields) } } };
       const outSchema = outputToOAS(m.output);
@@ -387,8 +389,10 @@ function fmtReservedNumbers(nums) {
   }
   return parts.join(', ');
 }
-function messageText(name, fields, reserved, options) {
-  const lines = ['message ' + name + ' {'];
+function messageText(desc, name, fields, reserved, options) {
+  const lines = [];
+  if (desc) String(desc).split('\n').forEach((l) => lines.push('// ' + l)); // 模型 desc → 消息上方注释
+  lines.push('message ' + name + ' {');
   const used = new Set();
   const usedNames = new Set(); // 字段名去重：snake 归一后防重名（如 message / Message → message）
   const resvNums = (reserved && reserved.numbers) || [];
@@ -406,7 +410,8 @@ function messageText(name, fields, reserved, options) {
     }
     usedNames.add(fn);
     const opts = optNonEmpty(f.options) ? ' [' + protoOptionsInline(f.options) + ']' : '';
-    lines.push(indent + protoType(f, name) + ' ' + fn + ' = ' + n + opts + ';');
+    const inline = f.desc ? ' // ' + String(f.desc).split('\n')[0] : ''; // 字段 desc → 行内注释
+    lines.push(indent + protoType(f, name) + ' ' + fn + ' = ' + n + opts + ';' + inline);
   };
   for (const f of fields) {
     if (!f.name) continue;
@@ -463,12 +468,14 @@ function toProto() {
   // models
   for (const m of project.models) {
     if (!m.name) continue;
-    chunks.push(messageText(m.name, m.fields, m.reserved, m.options));
+    chunks.push(messageText(m.desc, m.name, m.fields, m.reserved, m.options));
     for (const f of m.fields) if (f.type === 'timestamp') usesTs = true;
   }
   // services + request/response
   for (const r of project.resources) {
-    const svc = ['service ' + pascal(r.name) + 'Service {'];
+    const svc = [];
+    if (r.desc) String(r.desc).split('\n').forEach((l) => svc.push('// ' + l)); // 资源 desc → service 上方注释
+    svc.push('service ' + pascal(r.name) + 'Service {');
     for (const m of r.methods) {
       if (!m.name) continue;
       const ctx = m.name;
@@ -477,7 +484,12 @@ function toProto() {
       if (m.output.kind === 'ref' && m.output.ref) respName = m.output.ref;
       else if (m.output.kind === 'inline') respName = pascal(r.name) + ctx + 'Response';
       else { respName = 'google.protobuf.Empty'; usesEmpty = true; }
-      if (m.note) svc.push('  // ' + String(m.note).split('\n').join('\n  // '));
+      if (m.desc || m.note) { // 方法级：rpc 上方注释 = desc + note
+        const dl = [];
+        if (m.desc) String(m.desc).split('\n').forEach((l) => dl.push(l));
+        if (m.note) { const nl = String(m.note).split('\n'); dl.push('备注：' + nl[0]); for (let i = 1; i < nl.length; i++) dl.push('    ' + nl[i]); }
+        svc.push('  // ' + dl.join('\n  // '));
+      }
       const streamIn = (m.stream === 'client' || m.stream === 'bidi') ? 'stream ' : '';
       const streamOut = (m.stream === 'server' || m.stream === 'bidi') ? 'stream ' : '';
       const mopts = optNonEmpty(m.options);
@@ -488,10 +500,10 @@ function toProto() {
       } else {
         svc.push('  rpc ' + ctx + '(' + streamIn + reqName + ') returns (' + streamOut + respName + ');');
       }
-      chunks.push(messageText(reqName, m.input));
+      chunks.push(messageText('', reqName, m.input));
       for (const f of m.input) if (f.type === 'timestamp') usesTs = true;
       if (m.output.kind === 'inline') {
-        chunks.push(messageText(respName, m.output.fields));
+        chunks.push(messageText('', respName, m.output.fields));
         for (const f of m.output.fields) if (f.type === 'timestamp') usesTs = true;
       }
     }
@@ -579,6 +591,7 @@ function exportProject() {
   const name = (project.name || 'project').replace(/[^\w.-]+/g, '_');
   const ver = project.version || '1.0.0';
   downloadText(text, name + '-v' + ver + '.didl', 'text/yaml');
+  runSemanticCheck(); // 导出时按项目 priority 视角体检一次
   saveStatus('已导出项目 IDL');
 }
 function downloadText(text, filename, mime) {
@@ -600,6 +613,7 @@ function importIdlFile(file) {
         refreshDerived(); renderTree(); renderForm();
         const nM = p.resources.reduce((a, x) => a + x.methods.length, 0);
         addLog('info', '导入 IDL 成功：' + (p.name || '') + ' v' + (p.version || ''), ['资源 ' + p.resources.length + ' · 模型 ' + p.models.length + ' · 方法 ' + nM]);
+        runSemanticCheck(); // 导入后按 priority 视角体检
         saveStatus('已导入 IDL 项目');
       }
     } catch (e) {
@@ -673,7 +687,7 @@ function renderForm() {
       '<label class="fld sm"><span>流类型</span><select id="mStream"><option value="none">none</option><option value="server">server</option><option value="client">client</option><option value="bidi">bidi</option></select></label>' +
       '</div>' +
       '<label class="fld grow"><span>描述</span><input id="mDesc" value="' + esc(m.desc) + '" placeholder="描述"></label>' +
-      '<label class="fld grow"><span>备注说明</span><textarea id="mNote" class="code" rows="2" placeholder="写该方法的备注、注意事项、调用说明等（仅文档用途，不影响生成契约）">' + esc(m.note) + '</textarea></label>' +
+      '<label class="fld grow"><span>备注说明</span><textarea id="mNote" class="code" rows="2" placeholder="写该方法的备注、注意事项、调用说明等（作为文档与编程智能体提示词，不直接影响生成契约）">' + esc(m.note) + '</textarea></label>' +
       '<label class="fld grow"><span>预期正常返回示例（200）</span><textarea id="mExample" class="code" rows="3" placeholder=' + "'" + '{"id":"1","name":"示例","status":"published"}' + "'" + '>预期返回的示例 JSON/YAML；填写后调试台发送 200 时直接用它作为响应</textarea>' + '</label>' +
       '<label class="fld grow"><span>options（proto method 级，JSON）</span><textarea id="mOpts" class="code" rows="2" placeholder=' + "'" + '{"deprecated": true}' + "'" + '>' + esc(optsToText(m.options)) + '</textarea></label>' +
       '<div class="group-label">输入字段 input</div><div id="inflds"></div><button class="btn sm" id="addIn">＋ 输入字段</button>' +
@@ -728,12 +742,15 @@ function renderForm() {
     '<label class="fld grow"><span>服务名</span><input id="projName" value="' + esc(project.name || '') + '" placeholder="MyService"></label>' +
     '<label class="fld grow"><span>版本</span><input id="projVersion" value="' + esc(project.version || '') + '" placeholder="1.0.0"></label>' +
     '<label class="fld grow"><span>描述</span><textarea id="projDesc" class="code" rows="2" placeholder="服务简介">' + esc(project.description || '') + '</textarea></label>' +
+    '<label class="fld grow"><span>主契约策略（只影响检查视角，产出恒为 both）</span><select id="projPriority"><option value="both">两端（both）</option><option value="rest">REST 优先</option><option value="rpc">RPC 优先</option></select></label>' +
     '<label class="fld grow"><span>proto imports（每行一个，如 google/protobuf/timestamp.proto）</span><textarea id="projImports" class="code" rows="2" placeholder="google/protobuf/timestamp.proto">' + esc((project.imports || []).join('\n')) + '</textarea></label>' +
     '<label class="fld grow"><span>options（proto 文件级，JSON）</span><textarea id="projOptions" class="code" rows="2" placeholder=' + "'" + '{"java_package": "com.example.msg"}' + "'" + '>' + esc(optsToText(project.options)) + '</textarea></label>' +
     '<div class="group-label">在左侧选择资源 / 方法 / 模型开始设计</div>';
   bindText('projName', (v) => { project.name = v; refreshDerived(); });
   bindText('projVersion', (v) => { project.version = v; refreshDerived(); });
   bindText('projDesc', (v) => { project.description = v; refreshDerived(); });
+  const projPri = $('projPriority'); projPri.value = priorityOf();
+  projPri.onchange = () => { project.options = project.options || {}; project.options.priority = projPri.value; refreshDerived(); }; // 随 .didl 携带
   $('projImports').addEventListener('input', (e) => { project.imports = e.target.value.split(/\n/).map((s) => s.trim()).filter(Boolean); refreshDerived(); });
   bindText('projOptions', (v) => { project.options = parseOptions(v); refreshDerived(); });
 }
@@ -1035,20 +1052,18 @@ function initResizer() {
     window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
   });
 }
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((x) => x.classList.toggle('active', x.dataset.tab === tab));
+  activeTab = tab;
+  document.querySelectorAll('.tab-panel').forEach((p) => { p.hidden = p.id !== 'panel-' + tab; });
+  if (activeTab === 'debug') renderDebug();
+  if (activeTab === 'source') refreshDerived();
+  if (activeTab === 'log') renderLog();
+}
 function initTabs() {
-  document.querySelectorAll('.tab-btn').forEach((b) => {
-    b.onclick = () => {
-      document.querySelectorAll('.tab-btn').forEach((x) => x.classList.remove('active'));
-      b.classList.add('active');
-      activeTab = b.dataset.tab;
-      document.querySelectorAll('.tab-panel').forEach((p) => { p.hidden = p.id !== 'panel-' + b.dataset.tab; });
-      if (activeTab === 'debug') renderDebug();
-      if (activeTab === 'source') refreshDerived();
-      if (activeTab === 'log') renderLog();
-    };
-  });
-  $('copyOpenapi').onclick = () => copyText($('openapiView').textContent, 'OpenAPI 已复制');
-  $('copyProto').onclick = () => copyText($('protoView').textContent, 'proto 已复制');
+  document.querySelectorAll('.tab-btn').forEach((b) => { b.onclick = () => switchTab(b.dataset.tab); });
+  $('copyOpenapi').onclick = () => copyWithCheck('rest', () => copyText($('openapiView').textContent, 'OpenAPI 已复制'));
+  $('copyProto').onclick = () => copyWithCheck('rpc', () => copyText($('protoView').textContent, 'proto 已复制'));
 }
 function copyText(text, msg) {
   if (navigator.clipboard) { navigator.clipboard.writeText(text).then(() => sourceStatus(msg)); return; }
@@ -1091,6 +1106,74 @@ function addLog(type, title, lines) {
   if (activeTab === 'log') renderLog();
 }
 function protoCollisionWarn(msg) { addLog('warn', msg); } // proto 标识符冲突：记录到「日志」标签页
+
+// ---------- 语义完整性检查（产出恒 both，策略只影响检查视角） ----------
+let pendingCopy = null; // 复制中断弹窗：暂存待执行的复制动作
+function priorityOf() { return (project.options && project.options.priority) || 'both'; } // rest | rpc | both
+function reportCheck(label, issues) {
+  if (!issues.length) { addLog('info', label + '：语义完整，无缺失', []); return; }
+  const warns = issues.filter((i) => i.severity === 'warn').map((i) => i.msg);
+  const infos = issues.filter((i) => i.severity === 'info').map((i) => i.msg);
+  if (warns.length) addLog('warn', label + '（缺失 ' + warns.length + ' 项）', warns);
+  if (infos.length) addLog('info', label + '（建议 ' + infos.length + ' 项）', infos);
+}
+function runRestCheck() { // 复制/导出 OpenAPI 时：以 REST 视角检查语义完整性
+  const issues = [];
+  const push = (severity, msg) => issues.push({ severity, msg });
+  for (const r of project.resources) for (const m of r.methods) {
+    if (!m.name) continue;
+    const who = r.name + '.' + m.name;
+    if (!String(m.desc || '').trim()) push('warn', '方法 ' + who + ' 缺描述：OpenAPI description 为空，AI/消费端读不到语义');
+    for (const f of m.input) if (f.name && !String(f.desc || '').trim()) push('warn', '字段 ' + who + '.' + f.name + ' 缺描述（schema description 缺失）');
+    if (!String(m.http || '').trim() && (!m.stream || m.stream === 'none')) push('info', '方法 ' + who + ' 未显式配置 http：将按默认规则生成路由（可显式指定以明确 REST 语义）');
+    if (m.stream && m.stream !== 'none' && !String(m.desc || '').trim() && !String(m.note || '').trim()) push('warn', '流式方法 ' + who + ' 未在 desc/note 说明消息结构（OpenAPI 无法强类型表达）');
+    if (!m.errors || !m.errors.length) push('info', '方法 ' + who + ' 未定义错误码/状态码');
+  }
+  if (!String(project.description || '').trim()) push('info', '项目未填描述');
+  reportCheck('REST 检查', issues);
+  return { warns: issues.filter((i) => i.severity === 'warn').length, infos: issues.filter((i) => i.severity === 'info').length };
+}
+function runRpcCheck() { // 复制/导出 proto 时：以 RPC 视角检查语义完整性
+  const issues = [];
+  const push = (severity, msg) => issues.push({ severity, msg });
+  for (const r of project.resources) for (const m of r.methods) {
+    if (!m.name) continue;
+    const who = r.name + '.' + m.name;
+    if (!String(m.desc || '').trim() && !String(m.note || '').trim()) push('warn', '方法 ' + who + ' 在 proto 无注释（desc/note 均为空）：RPC 唯一文档通道缺失');
+    for (const f of m.input) if (f.name && !String(f.desc || '').trim()) push('warn', '字段 ' + who + '.' + f.name + ' 无注释');
+    for (const f of m.input) if (f.name && !(f.tag > 0)) push('info', '字段 ' + who + '.' + f.name + ' 未显式编号（tag）');
+    if (m.stream && m.stream !== 'none' && !String(m.desc || '').trim() && !String(m.note || '').trim()) push('warn', '流式方法 ' + who + ' 未在 desc/note 说明消息结构');
+  }
+  for (const m of project.models) {
+    if (!m.name) continue;
+    if (!String(m.desc || '').trim()) push('info', '模型 ' + m.name + ' 缺描述');
+    for (const f of m.fields) { if (f.name && !String(f.desc || '').trim()) push('warn', '字段（模型 ' + m.name + '）.' + f.name + ' 无注释'); if (f.name && !(f.tag > 0)) push('info', '字段（模型 ' + m.name + '）.' + f.name + ' 未显式编号（tag）'); }
+  }
+  // P7：google.api.http 注解开关位（默认关，仅保留开关，不检查）
+  const PROTO_HTTP_ANNOTATION_CHECK = false;
+  reportCheck('RPC 检查', issues);
+  return { warns: issues.filter((i) => i.severity === 'warn').length, infos: issues.filter((i) => i.severity === 'info').length };
+}
+function runSemanticCheck(perspective) { // perspective 缺省按项目 priority；返回 { warns, infos }
+  const p = perspective || priorityOf();
+  if (p === 'both') { const a = runRestCheck(), b = runRpcCheck(); return { warns: a.warns + b.warns, infos: a.infos + b.infos }; }
+  else if (p === 'rest') return runRestCheck();
+  else return runRpcCheck();
+}
+// 复制前先检查：有 warn 缺失则中断（先查看日志/依旧复制）；仅 info 或通过则无中断通知并复制
+function copyWithCheck(perspective, doCopy) {
+  const label = perspective === 'rest' ? 'REST（OpenAPI）' : 'RPC（proto）';
+  const summary = runSemanticCheck(perspective);
+  if (summary.warns > 0) {
+    pendingCopy = doCopy;
+    $('checkBody').innerHTML = '<p>检测到 <b>' + summary.warns + '</b> 项语义缺失（' + label + ' 视角，另有建议 ' + summary.infos + ' 项）。</p><p>可先到「日志」标签页查看缺失项，或仍复制当前契约。</p>';
+    $('checkModal').hidden = false;
+  } else {
+    doCopy();
+    if (summary.infos > 0) saveStatus('已复制；' + label + ' 检查通过（' + summary.infos + ' 项建议，见日志）');
+    else saveStatus('已复制；' + label + ' 检查通过，语义完整');
+  }
+}
 function renderLog() {
   const el = $('logView'); if (!el) return;
   if (!logs || !logs.length) { el.innerHTML = '<div class="placeholder">暂无日志。导入 OpenAPI 产生的错误报告与丢失记录会显示在这里。</div>'; return; }
@@ -1132,6 +1215,7 @@ function doImport() {
     saveStatus('已导入 ' + p.resources.length + ' 资源 / ' + p.models.length + ' 模型');
     addLog('info', '导入成功：' + (p.name || '') + ' v' + (p.version || ''), ['资源 ' + p.resources.length + ' · 模型 ' + p.models.length + ' · 方法 ' + p.resources.reduce((a, r) => a + r.methods.length, 0)]);
     if (res.warnings && res.warnings.length) addLog('warn', '导入丢失记录（' + res.warnings.length + ' 条）', res.warnings);
+    runSemanticCheck(); // 导入后按 priority 视角体检
   } catch (e) {
     $('impWarn').innerHTML = '<div class="imp-warn-title">导入失败：</div><ul><li>' + esc(e.message) + '</li></ul>';
     addLog('error', '导入失败', [e.message]);
@@ -1258,6 +1342,16 @@ async function init() {
     const d = await fetch('/api/project').then((r) => r.json());
     project = (d && d.ok && d.project) ? d.project : defaultProject();
   } catch (e) { project = defaultProject(); }
+  $('healthBtn').onclick = () => runSemanticCheck(); // 策略化体检
+  // 复制中断弹窗：先查看日志 / 依旧复制
+  $('checkViewLog').onclick = () => { $('checkModal').hidden = true; pendingCopy = null; switchTab('log'); };
+  $('checkStillCopy').onclick = () => { $('checkModal').hidden = true; const fn = pendingCopy; pendingCopy = null; if (fn) fn(); };
+  $('checkClose').onclick = () => { $('checkModal').hidden = true; pendingCopy = null; };
+  $('checkModal').addEventListener('click', (e) => { if (e.target === $('checkModal')) { $('checkModal').hidden = true; pendingCopy = null; } });
+  // 主契约策略决定右面板默认标签（rest→OpenAPI、rpc→proto、both→保持 IDL 源码）
+  const prio = priorityOf();
+  if (prio === 'rest') switchTab('openapi');
+  else if (prio === 'rpc') switchTab('proto');
   refreshDerived();
   renderTree();
   renderForm();

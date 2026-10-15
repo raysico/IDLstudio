@@ -6,7 +6,7 @@
 - **Spec-first**：IDL 是唯一真相源，REST 与 RPC 均由它生成，避免有损的 REST↔RPC 互译。
 - 面向资源的 API 设计方法论（Google AIP 风格）：资源 + 标准方法（Get/List/Create/Update/Delete）。
 - 交付两套契约：一份 OpenAPI（可直接喂给 tana/anytype 那种 OpenAPI 驱动调试客户端），一份 `.proto`（gRPC 契约）。
-- **产物 AI 友好**：生成的 OpenAPI / proto 自带备注（`x-note` / 注释）与预期返回示例，可直接交付给 AI/LLM 进行编程；无基础用户设计完即可转交 AI 实现，减少沟通成本。
+- **产物 AI 友好**：生成的 OpenAPI / proto 把方法/字段/模型/资源的描述（`desc`）与备注（`note`）作为注释输出（OpenAPI 并入 `description` 并保留 `x-note` 无损副本、proto 全级注释），叠加预期返回示例，可直接交付给 AI/LLM 作为提示词进行编程；无基础用户设计完即可转交 AI 实现，减少沟通成本。
 
 ## 2. 内部 IDL 语法（DSL）
 YAML 形态，与内部模型一一对应：
@@ -26,7 +26,7 @@ resources:             # 资源：每个资源是一组相关方法 + 默认增�
           status: { type: enum, enum: [draft, published] }
           createdAt: { type: timestamp }
         output: Node                                # 字符串 = 模型引用
-        note: 备注说明（仅文档用途）                 # 可选：方法备注/注意事项
+        note: 备注说明（作为文档与编程智能体提示词） # 可选：方法备注/注意事项；并入 OpenAPI description 与 proto 注释
         example: |                                  # 可选：预期正常返回(200)示例
           {
             "id": "1",
@@ -82,7 +82,7 @@ models:                # 可复用的数据结构
   - `in=path/query/header` 字段 → `parameters`；`in=body` 字段 → `requestBody`（application/json object）
   - `output`：模型引用 → 200 schema `$ref`；内联对象 → 内联 schema；void → 空响应
   - `errors` 列表 → 对应状态码的 error responses
-  - `note` → 附带为 OpenAPI 操作的 `x-note`，并在 proto 中作为 rpc 前的注释
+  - `desc` / `note` → 并入 OpenAPI 操作的 `description`（note 作为独立段落「备注：…」），并保留 `x-note` 无损副本；proto 侧见 §5 注释发射
   - `example` → 作为 200 响应的 `content.application/json.example`（示例可 JSON 或 YAML，自动解析）；用于前端按预期对接、调试台直接取用、以及交付 AI 时的契约示例
 - `components/schemas`：所有 `models` 转成 schema
 - 标准方法默认路由：`Create→POST /<复数>`、`Get→GET /<复数>/{id}`、`List→GET /<复数>`、`Update→PATCH /<复数>/{id}`、`Delete→DELETE /<复数>/{id}`；`http` 自定义则优先
@@ -98,6 +98,7 @@ models:                # 可复用的数据结构
 - 每个 `enum` 字段 → 生成 `enum <消息名><字段名> { <字段名>_UNSPECIFIED=0; <值>=1..; }`
 - `timestamp` → 引用 `google/protobuf/timestamp.proto`（按需 import）
 - 错误模型：REST 端用 HTTP 状态码；proto 端在 `.proto` 顶部注释约定错误由 `google.rpc.Status` 承载
+- **注释发射**：方法 `desc`+`note` → `rpc` 上方注释；字段 `desc` → 行内注释；模型 `desc` → `message` 上方注释；资源 `desc` → `service` 上方注释
 
 ## 6. 模块结构
 ```
@@ -120,7 +121,7 @@ IDLstudio/
 - 响应展示复用客户端样式（状态码/响应头/格式化 JSON），并带查找高亮（复用查找逻辑）
 
 ## 8. 限制与后续
-- 当前覆盖：资源 + 标准方法 + 常见类型 + 单层错误码；**流式（server/client/bidi stream）、oneof、嵌套 map 的复杂表达、权限 scope、版本化策略**暂不在 v0.1
+- 当前覆盖：资源 + 标准方法 + 常见类型 + 单层错误码 + 无损属性（`tag` / `oneof` / `stream` / `imports` / `reserved` / `options`，见 §9.3）；暂不在覆盖范围：**嵌套 map 的复杂表达、权限 scope、版本化策略**
 - 后续可选：外部契约导入与无损往返见 §9；另可选 `.proto` 多文件工程、代码生成（客户端 stubs）
 
 ## 9. 导入与无损往返（规划）
@@ -173,7 +174,7 @@ IDLstudio/
 
 ### 9.5 表单与实现落点
 - 每个模型/方法/字段增加「**高级(proto)属性**」可折叠区，默认收起。
-- 新增 `public/importers.js`（`openApiToModel` / `protoToModel` / `parseIdlYaml`）；`app.js` 接入导入流程与名称冲突处理；`index.html` 加入口；`server.js` 不动。
+- 已实现 `public/importer.js`（OpenAPI 3.x → IDL：`openApiToModel` / `parseIdlYaml`）；`app.js` 接入导入流程与名称冲突处理；`index.html` 加入口；`server.js` 不动。`protoToModel`（proto 反向导入）尚未实现（见 ROADMAP）。
 - **无损验收标准**：导入 proto → 导出 → 再导入 → **逐字节一致**（golden round-trip）。
 
 ### 9.6 分期
@@ -186,3 +187,15 @@ IDLstudio/
 - 导出/复制生成的 OpenAPI 可被 tana/anytype 调试客户端加载
 - 调试台发送返回可读的示例响应，查找可高亮
 - 浅色/暗夜主题切换正常
+- 语义完整性检查：复制含 warn 缺失的契约 → 弹窗中断二选一「先查看日志 / 依旧复制」；完整或仅 info → 无中断，提示显示在「新建项目」左侧通知区
+
+## 11. 语义完整性检查（1.1.0）
+- **产出恒 both + 按产物自动检查**：复制 / 导出 / 导入 / 体检时，按当前「主契约策略」视角做语义 lint；策略只影响检查视角，不改变产出（始终 both）。
+- **主契约策略**：`rest` / `rpc` / `both`（默认 `both`），随 `.didl` 携带；决定右面板默认标签（rest→OpenAPI / rpc→proto / both→保持）与体检汇总视角。
+- **REST 清单**：R1 方法缺 desc(warn)、R3 字段缺 desc(warn)、R4 http 未显式配置(info)、R5 流式方法无说明(warn)、R6 项目缺描述(info)、R7 无错误码(info)。
+- **RPC 清单**：P1 方法 desc+note 均空(warn)、P2 字段无注释(warn)、P3 snake 归一重名(warn)、P4 字段未编号(info)、P5 模型缺描述(info)、P6 疑似流式(info)、P7 http 注解开关位(默认关)。
+- **分级提醒**：warn 级缺失 → 弹窗中断二选一；info 或通过 → 无中断通知。检查结果写入日志标签页（复用 `addLog`，本地持久化）。
+
+## 12. 版本与容器化（1.0.0）
+- **版本单一源**：`package.json` 的 `version`；`server.js` 启动时缓存，经 `/api/version` 供页脚显示 `Powered by hoxiudimdim · vX`；改版本号必须重启服务才生效。
+- **容器化**：`Dockerfile`（`node:20-alpine`、命名卷 `/app/data`、HEALTHCHECK `/api/health`）；`server.js` 的 `HOST` / `PROJECT_FILE` 可经 env 配置；GHCR 多架构镜像 `ghcr.io/raysico/idlstudio`（打 `v*` tag 触发）。

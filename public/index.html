@@ -85,7 +85,8 @@
     </div>
     <div class="tab-panel" id="panel-log" hidden>
       <div class="panel-toolbar">
-        <span class="hist-hint">导入错误报告与丢失记录（本地持久化，最多 200 条）</span>
+        <span class="hist-hint">导入错误报告与丢失记录 + 语义完整性检查（本地持久化，最多 200 条）</span>
+        <button id="healthBtn" class="btn" title="按项目「主契约策略」跑一次语义完整性体检，结果见本页">策略化体检</button>
         <button id="logClear" class="btn">清空</button>
       </div>
       <div id="logView"></div>
@@ -100,6 +101,18 @@
   <div class="modal modal-sm">
     <div class="modal-head"><span class="ftitle">快捷键</span><button id="scClose" class="btn" title="关闭">×</button></div>
     <div class="modal-body" id="scBody"></div>
+  </div>
+</div>
+
+<!-- 复制前语义检查中断弹窗 -->
+<div id="checkModal" class="modal-overlay" hidden>
+  <div class="modal modal-sm">
+    <div class="modal-head"><span class="ftitle">语义完整性检查</span><button id="checkClose" class="btn" title="关闭">×</button></div>
+    <div class="modal-body" id="checkBody"></div>
+    <div class="modal-foot">
+      <button class="btn" id="checkViewLog" title="切到「日志」标签页查看缺失项">先查看日志</button>
+      <button class="btn primary" id="checkStillCopy" title="仍复制当前契约">依旧复制</button>
+    </div>
   </div>
 </div>
 

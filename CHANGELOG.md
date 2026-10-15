@@ -1,5 +1,13 @@
 # 更新记录 (Changelog)
 
+## 1.1.0 (2026-10-15)
+- **语义提示词双端强化（产出恒 both）**：
+  - OpenAPI：方法 `description` = desc + note（note 追加为独立段落），保留 `x-note` 无损副本；字段 desc → schema `description`（已有）。
+  - proto：方法 rpc 上方注释 = desc + note；字段 desc → 行内注释；模型 desc → 消息上方注释；资源 desc → service 上方注释。
+- **按产物自动检查（语义完整性 lint，产出恒 both）**：复制 OpenAPI → REST 视角体检；复制 proto → RPC 视角体检；导出/导入 → 按主契约策略体检；日志页新增「策略化体检」按钮；结果进「日志」标签页。
+- **主契约策略（project.options.priority）**：rest / rpc / both（默认 both），随 .didl 导出/导入携带；决定右面板默认标签与体检汇总视角。`google.api.http` 检查仅留开关位，默认关。
+- 版本号机制沿用 package.json 单一源（页脚 v1.1.0）。
+
 ## 1.0.1 (2026-10-15)
 - **proto 标识符冲突加固**：字段名 / 枚举常量在 snake 归一后去重并数字后缀避让（`message`/`Message`→`message`/`message_2`；枚举值归一重名、与自动 `_UNSPECIFIED` 冲突均避让），冲突记入「日志」标签页；新增 `test/collision-test.project.json` 与 `test/proto-collision-test.js` 回归测试。
 - **提交规范**：新增 `提交规范.md`——提交前须将 `project.json` 重置为「新建项目」示例数据，避免验收测试数据残留入库。
