@@ -1,6 +1,6 @@
 {
   "name": "idl-service-design-studio",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "IDL Service Design Studio：内部 IDL 可视化设计台，用表单设计中立 IDL 契约，实时编译生成 OpenAPI 3.1（REST）与 protobuf/gRPC（RPC）两套契约，内置 mock 调试台",
   "main": "server.js",
   "license": "MIT",

@@ -1,5 +1,13 @@
 # 更新记录 (Changelog)
 
+## 1.1.2 (2026-10-15)
+- **proto 生成器修复（4 类）**：
+  - **#1 嵌套 timestamp import**：`array<timestamp>` / `map<string,timestamp>` 现在会生成 `import "google/protobuf/timestamp.proto"`（此前 usesTs 只检顶层类型，漏检嵌套 → proto 缺 import）。
+  - **#2 array\<enum\> / 空 enum 定义**：`array` 且 `itemsType='enum'` 的枚举现在会生成定义；空 enum（无值）也发射保真最小 `enum X { X_UNSPECIFIED = 0; }`，避免类型引用悬空（此前未定义 → proto 编译报未定义）。
+  - **#3 显式 tag 与自动编号撞车**：发射前预扫描全部显式 tag 占用编号，自动号跳过 used/reserved；显式 tag 与已有编号/保留号冲突时记录 warn 并避让到下一可用号（此前可能 `string a = 1; string b = 1;` 撞号）。
+  - **#4 标识符清洗**：proto 标识符不能以数字开头——模型 / 字段 / 枚举 / service / rpc / package 名若以数字开头，自动加下划线前缀并记 warn（此前如 `message 1Model`、字段 `1abc` 为非法标识符）；枚举/字段 snake 归一重名去重避让沿用（1.0.1）。
+- 回归验证：构造含嵌套 timestamp、array<enum>、空 enum、显式 tag 撞号、数字开头命名的模型跑生成器，输出均可被 protoc 接受（数字开头已清洗）。
+
 ## 1.1.1 (2026-10-15)
 - **js-yaml vendor 进 `public/vendor/`，彻底消除对 node_modules 的运行时依赖**：
   - 浏览器版 js-yaml 内嵌仓库（含 MIT 许可头），`server.js` 不再从 `node_modules` 读取 `/vendor/js-yaml.min.js`；**无需 `npm install` 即可运行**（沙箱 / 离线 / 下载即用）。

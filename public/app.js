@@ -363,7 +363,7 @@ function protoType(f, ctx) {
     case 'timestamp': return 'google.protobuf.Timestamp';
     case 'enum': return enumName(ctx, f);
     case 'array': return 'repeated ' + protoElem(f.itemsType, f.itemsRef, ctx, f);
-    case 'ref': return f.ref;
+    case 'ref': return cleanIdent(f.ref); // 引用模型名与 message 名保持一致（标识符清洗）
     case 'map': {
       const k = 'string';
       const v = protoElem(f.mapValueType, f.mapValueRef, ctx, f);
@@ -378,7 +378,17 @@ function protoElem(type, ref, ctx, f) {
   if (type === 'enum') return enumName(ctx, f);
   return type === 'int' ? 'int64' : type === 'number' ? 'double' : type === 'bool' ? 'bool' : type;
 }
-function enumName(ctx, f) { return pascal(ctx) + pascal(f.name) + 'Value'; }
+// #4 标识符缺口：proto 标识符不能以数字开头，规范化后若以数字开头则加下划线前缀
+function cleanIdent(s) {
+  const x = String(s == null ? '' : s);
+  if (/^\d/.test(x)) { protoCollisionWarn('标识符以数字开头（非法 proto 标识符），已加下划线前缀：' + String(s) + ' -> _' + x); return '_' + x; }
+  return x;
+}
+// #2 枚举字段判定：顶层 enum 或 array<enum>（itemsType 为 enum）
+function isEnumField(f) { return f && (f.type === 'enum' || (f.type === 'array' && f.itemsType === 'enum')); }
+// #1 嵌套 timestamp 判定：顶层 timestamp 或 array/map 内嵌 timestamp
+function fieldUsesTs(f) { return f && (f.type === 'timestamp' || (f.type === 'array' && f.itemsType === 'timestamp') || (f.type === 'map' && f.mapValueType === 'timestamp')); }
+function enumName(ctx, f) { return cleanIdent(pascal(ctx) + pascal(f.name) + 'Value'); }
 function fmtReservedNumbers(nums) {
   const a = Array.from(new Set((nums || []).map(Number).filter((n) => !isNaN(n) && n > 0))).sort((x, y) => x - y);
   const parts = [];
@@ -394,16 +404,29 @@ function fmtReservedNumbers(nums) {
 function messageText(desc, name, fields, reserved, options) {
   const lines = [];
   if (desc) String(desc).split('\n').forEach((l) => lines.push('// ' + l)); // 模型 desc → 消息上方注释
-  lines.push('message ' + name + ' {');
+  lines.push('message ' + cleanIdent(name) + ' {');
   const used = new Set();
   const usedNames = new Set(); // 字段名去重：snake 归一后防重名（如 message / Message → message）
   const resvNums = (reserved && reserved.numbers) || [];
   const groups = {};
+  // #3 预扫描显式 tag：先占用全部显式号（自动号会跳过 used），并检测显式号冲突 / 撞保留号
+  const tagByFid = new Map();   // fid -> 有效显式号
+  const tagCollide = new Map(); // fid -> 原显式号（冲突待避让）
+  for (const f of fields) {
+    if (!f.name || f.tag <= 0) continue;
+    if (used.has(f.tag) || resvNums.includes(f.tag)) tagCollide.set(f.id, f.tag);
+    else { used.add(f.tag); tagByFid.set(f.id, f.tag); }
+  }
   const emitField = (f, indent) => {
-    let n = (f.tag > 0) ? f.tag : 0;
-    if (n <= 0) { do { n++; } while (used.has(n) || resvNums.includes(n)); }
+    let n;
+    if (tagByFid.has(f.id)) {
+      n = tagByFid.get(f.id);
+    } else {
+      n = 0; do { n++; } while (used.has(n) || resvNums.includes(n)); // 自动编号 / 显式冲突避让
+      if (tagCollide.has(f.id)) protoCollisionWarn('字段编号冲突：message ' + name + ' 字段 "' + f.name + '" 显式 tag=' + tagCollide.get(f.id) + ' 与已有编号/保留号冲突，已避让为 ' + n);
+    }
     used.add(n);
-    let fn = snake(f.name);
+    let fn = cleanIdent(snake(f.name)); // #4 字段名标识符清洗（数字开头加前缀）
     if (usedNames.has(fn)) {
       const orig = fn; let k = 2;
       while (usedNames.has(orig + '_' + k)) k++;
@@ -421,7 +444,7 @@ function messageText(desc, name, fields, reserved, options) {
     emitField(f, '  ');
   }
   for (const gname of Object.keys(groups)) {
-    lines.push('  oneof ' + snake(gname) + ' {');
+    lines.push('  oneof ' + cleanIdent(snake(gname)) + ' {');
     for (const f of groups[gname]) emitField(f, '    ');
     lines.push('  }');
   }
@@ -433,7 +456,7 @@ function messageText(desc, name, fields, reserved, options) {
   return lines.join('\n');
 }
 function toProto() {
-  const pkg = (project.name || 'service').toLowerCase().replace(/[^a-z0-9_.]/g, '_');
+  const pkg = cleanIdent((project.name || 'service').toLowerCase().replace(/[^a-z0-9_.]/g, '_'));
   const chunks = ['syntax = "proto3";', '', 'package ' + pkg + ';'];
   const importList = [];
   const addImport = (imp) => { if (imp && !importList.includes(imp)) importList.push(imp); };
@@ -443,11 +466,11 @@ function toProto() {
   const seenEnums = {};
   function addEnum(ctx, f) {
     const nm = enumName(ctx, f);
-    if (seenEnums[nm] || !f.enum || !f.enum.length) return;
+    if (seenEnums[nm]) return;
     seenEnums[nm] = true;
     const lines = ['enum ' + nm + ' {', '  ' + nm + '_UNSPECIFIED = 0;'];
     const constNames = new Set([nm + '_UNSPECIFIED']); // 常量名去重：归一后防重名，且避让自动 UNSPECIFIED
-    f.enum.forEach((v, i) => {
+    (f.enum || []).forEach((v, i) => { // 空 enum 仅发 UNSPECIFIED（保真最小枚举，避免悬空引用）
       let base = nm + '_' + snake(v).toUpperCase();
       let cn = base;
       if (constNames.has(cn)) {
@@ -462,29 +485,29 @@ function toProto() {
     lines.push('}');
     enumBlocks.push(lines.join('\n'));
   }
-  for (const m of project.models) for (const f of m.fields) if (f.type === 'enum') addEnum(m.name, f);
+  for (const m of project.models) for (const f of m.fields) if (isEnumField(f)) addEnum(m.name, f);
   for (const { m } of collectMethods()) {
-    for (const f of m.input) if (f.type === 'enum') addEnum(m.name + m.name + 'Request', f);
-    if (m.output.kind === 'inline') for (const f of m.output.fields) if (f.type === 'enum') addEnum(m.name + m.name + 'Response', f);
+    for (const f of m.input) if (isEnumField(f)) addEnum(m.name + m.name + 'Request', f);
+    if (m.output.kind === 'inline') for (const f of m.output.fields) if (isEnumField(f)) addEnum(m.name + m.name + 'Response', f);
   }
   // models
   for (const m of project.models) {
     if (!m.name) continue;
     chunks.push(messageText(m.desc, m.name, m.fields, m.reserved, m.options));
-    for (const f of m.fields) if (f.type === 'timestamp') usesTs = true;
+    for (const f of m.fields) if (fieldUsesTs(f)) usesTs = true;
   }
   // services + request/response
   for (const r of project.resources) {
     const svc = [];
     if (r.desc) String(r.desc).split('\n').forEach((l) => svc.push('// ' + l)); // 资源 desc → service 上方注释
-    svc.push('service ' + pascal(r.name) + 'Service {');
+    svc.push('service ' + cleanIdent(pascal(r.name) + 'Service') + ' {');
     for (const m of r.methods) {
       if (!m.name) continue;
-      const ctx = m.name;
-      const reqName = pascal(r.name) + ctx + 'Request';
+      const ctx = cleanIdent(m.name);
+      const reqName = cleanIdent(pascal(r.name) + ctx + 'Request');
       let respName;
-      if (m.output.kind === 'ref' && m.output.ref) respName = m.output.ref;
-      else if (m.output.kind === 'inline') respName = pascal(r.name) + ctx + 'Response';
+      if (m.output.kind === 'ref' && m.output.ref) respName = cleanIdent(m.output.ref);
+      else if (m.output.kind === 'inline') respName = cleanIdent(pascal(r.name) + ctx + 'Response');
       else { respName = 'google.protobuf.Empty'; usesEmpty = true; }
       if (m.desc || m.note) { // 方法级：rpc 上方注释 = desc + note
         const dl = [];
@@ -503,10 +526,10 @@ function toProto() {
         svc.push('  rpc ' + ctx + '(' + streamIn + reqName + ') returns (' + streamOut + respName + ');');
       }
       chunks.push(messageText('', reqName, m.input));
-      for (const f of m.input) if (f.type === 'timestamp') usesTs = true;
+      for (const f of m.input) if (fieldUsesTs(f)) usesTs = true;
       if (m.output.kind === 'inline') {
         chunks.push(messageText('', respName, m.output.fields));
-        for (const f of m.output.fields) if (f.type === 'timestamp') usesTs = true;
+        for (const f of m.output.fields) if (fieldUsesTs(f)) usesTs = true;
       }
     }
     svc.push('}');
