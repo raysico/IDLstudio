@@ -1,5 +1,15 @@
 # 更新记录 (Changelog)
 
+## 1.2.2 (2026-10-16)
+- **proto 反向导入（导入Proto）**：新增 `public/protoImporter.js`（手写 proto3 子集 Lexer+Parser，零新依赖），顶栏「导入Proto」按钮 + 弹窗（粘贴 / 选 `.proto` 文件），service→资源、rpc→方法（含 4 种流式 none/server/client/bidi）、message→模型（map/repeated/oneof/reserved/tag 完整还原）、enum→IDL 枚举（回剔 `_UNSPECIFIED` 哨兵）、注释归位 `desc/note`、`import google/protobuf/*` 过滤、`package→项目名`（另存 `options._proto_package`）；有损点（类型归一等）进「日志」丢失记录。
+- **真源无损（导入源 = 无损锚点，他端报损）**：
+  - proto 导入不再内联/合成包装：具名请求/响应消息一律保留为模型 + `body:ref` / `output:ref`；`toProto` 对单 `body:ref` 直接透传模型名 → 再生成 proto **无损**（`rpc SayHello(HelloRequest)`、`rpc ClientStreamHello(stream StreamRequest)` 原样还原，不再有 `<Res><Method>Request` 合成包装）。
+  - `toOpenAPI` 对单个具名 body 直接 `$ref`（不再包 `body` 层）；proto 源流式方法报「REST 无法无损表达流式」损点日志（保留 `x-streaming`）。
+  - `toProto` 对 OpenAPI 源 REST 专有项（query/path 参数、自定义路由、状态码）报损点，proto 尾部附「损点说明」注释块。
+  - 损点日志在预览渲染时按集合去重上报，避免编辑刷屏。
+- **合成 body 字段豁免体检**：方法指向具名消息的 `body` 引用不再被语义检查误报「未编号 / 无注释 / 缺描述」。
+- **发布清理**：`project.json` 还原为「新建项目」示例数据；整个 `test/` 目录移除（含既有 collision 回归测试与本次往返验证脚本，遵循提交规范）。
+
 ## 1.1.2 (2026-10-15)
 - **proto 生成器修复（4 类）**：
   - **#1 嵌套 timestamp import**：`array<timestamp>` / `map<string,timestamp>` 现在会生成 `import "google/protobuf/timestamp.proto"`（此前 usesTs 只检顶层类型，漏检嵌套 → proto 缺 import）。

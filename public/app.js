@@ -313,7 +313,12 @@ function parseExample(text) {
   try { return window.jsyaml.load(t); } catch (e) {}
   return String(text);
 }
+// 真源无损：非锚点生成端的损点采集（OpenAPI 侧、proto 侧），由 renderOpenapi/renderProto 去重上报日志
+let _oasLosses = [], _protoLosses = [];
+let _lastOasLossKey = '', _lastProtoLossKey = '';
+
 function toOpenAPI() {
+  _oasLosses = [];
   const schemas = {};
   for (const m of project.models) if (m.name) schemas[m.name] = modelToOAS(m);
   const paths = {};
@@ -332,8 +337,16 @@ function toOpenAPI() {
       if (m.note && String(m.note).trim()) opDesc = opDesc ? opDesc + '\n\n备注：' + String(m.note) : String(m.note);
       const op = { operationId: r.name + m.name, tags: [r.name], description: opDesc || undefined, parameters: parameters.length ? parameters : undefined };
       if (m.note) op['x-note'] = m.note; // 保留无损副本（机器可读场景），语义主通道走标准 description
-      if (m.stream && m.stream !== 'none') op['x-streaming'] = m.stream;
-      if (bodyFields.length) op.requestBody = { content: { 'application/json': { schema: objFromFields(bodyFields) } } };
+      if (m.stream && m.stream !== 'none') {
+        // proto 为真源：流式无法以 REST 无损表达 → 报损点；保留 x-streaming 供参考
+        op['x-streaming'] = m.stream;
+        const loss = '方法「' + m.name + '」为 ' + m.stream + ' 流式，REST 无法无损表达流式传输，已降级为普通请求/响应并标记 x-streaming';
+        _oasLosses.push(loss);
+      }
+      // 单个具名 body:ref → requestBody 直接引用该 schema（不包一层 body）
+      const singleBodyRef = bodyFields.length === 1 && bodyFields[0].type === 'ref' && bodyFields[0].ref;
+      if (singleBodyRef) op.requestBody = { content: { 'application/json': { schema: { $ref: '#/components/schemas/' + bodyFields[0].ref } } } };
+      else if (bodyFields.length) op.requestBody = { content: { 'application/json': { schema: objFromFields(bodyFields) } } };
       const outSchema = outputToOAS(m.output);
       const respContent = outSchema ? { 'application/json': { schema: outSchema } } : undefined;
       if (respContent && m.example) { const ex = parseExample(m.example); if (ex !== undefined) respContent['application/json'].example = ex; }
@@ -456,6 +469,7 @@ function messageText(desc, name, fields, reserved, options) {
   return lines.join('\n');
 }
 function toProto() {
+  _protoLosses = [];
   const pkg = cleanIdent((project.name || 'service').toLowerCase().replace(/[^a-z0-9_.]/g, '_'));
   const chunks = ['syntax = "proto3";', '', 'package ' + pkg + ';'];
   const importList = [];
@@ -503,8 +517,15 @@ function toProto() {
     svc.push('service ' + cleanIdent(pascal(r.name) + 'Service') + ' {');
     for (const m of r.methods) {
       if (!m.name) continue;
+      // OpenAPI 为真源：REST 专有项在 gRPC 中无对应 → 报损点
+      if (m.http && String(m.http).trim()) _protoLosses.push('方法「' + m.name + '」的 REST 路由「' + m.http + '」在 gRPC 中无对应，已按方法名约定生成');
+      for (const f of m.input) if (f.in && f.in !== 'body') _protoLosses.push('方法「' + m.name + '」的 REST 参数「' + (f.name || '') + '」（' + f.in + '）在 gRPC 中无对应，已忽略');
       const ctx = cleanIdent(m.name);
-      const reqName = cleanIdent(pascal(r.name) + ctx + 'Request');
+      // 真源无损：input 为单个指向具名模型的 body:ref 时直接透传模型名（不合成包装），仅匿名内联体才合成 <Res><Method>Request
+      const isBodyRef = m.input.length === 1 && m.input[0].type === 'ref' && m.input[0].ref && project.models.some((x) => x.name === m.input[0].ref);
+      let reqName;
+      if (isBodyRef) reqName = cleanIdent(m.input[0].ref);
+      else reqName = cleanIdent(pascal(r.name) + ctx + 'Request');
       let respName;
       if (m.output.kind === 'ref' && m.output.ref) respName = cleanIdent(m.output.ref);
       else if (m.output.kind === 'inline') respName = cleanIdent(pascal(r.name) + ctx + 'Response');
@@ -525,8 +546,10 @@ function toProto() {
       } else {
         svc.push('  rpc ' + ctx + '(' + streamIn + reqName + ') returns (' + streamOut + respName + ');');
       }
-      chunks.push(messageText('', reqName, m.input));
-      for (const f of m.input) if (fieldUsesTs(f)) usesTs = true;
+      if (!isBodyRef) { // 仅匿名内联体才合成请求消息；body:ref 已由具名模型发出，不重复
+        chunks.push(messageText('', reqName, m.input));
+        for (const f of m.input) if (fieldUsesTs(f)) usesTs = true;
+      }
       if (m.output.kind === 'inline') {
         chunks.push(messageText('', respName, m.output.fields));
         for (const f of m.output.fields) if (fieldUsesTs(f)) usesTs = true;
@@ -545,6 +568,11 @@ function toProto() {
   if (fileOpts) {
     const optLines = Object.keys(fileOpts).map((k) => 'option ' + k + ' = ' + optVal(fileOpts[k]) + ';');
     chunks.splice(pkgIdx + 1 + importList.length, 0, ...optLines);
+  }
+  if (_protoLosses.length) {
+    const note = ['', '// --- 损点说明（OpenAPI 为真源，gRPC 侧无法无损表达） ---'];
+    _protoLosses.forEach((l) => note.push('// - ' + l));
+    chunks.push(note.join('\n'));
   }
   return chunks.filter((c) => c.trim() !== '').join('\n\n') + '\n';
 }
@@ -862,11 +890,25 @@ function renderSource() {
   try { $('sourceInput').value = window.jsyaml.dump(toYamlSource(), { lineWidth: 120 }); }
   catch (e) { /* 忽略 */ }
 }
+function reportOasLosses() {
+  if (!_oasLosses.length) return;
+  const key = _oasLosses.join('|');
+  if (key === _lastOasLossKey) return;
+  _lastOasLossKey = key;
+  addLog('warn', 'OpenAPI 生成损点（' + _oasLosses.length + '）', _oasLosses);
+}
+function reportProtoLosses() {
+  if (!_protoLosses.length) return;
+  const key = _protoLosses.join('|');
+  if (key === _lastProtoLossKey) return;
+  _lastProtoLossKey = key;
+  addLog('warn', 'Proto 生成损点（' + _protoLosses.length + '）', _protoLosses);
+}
 function renderOpenapi() {
-  try { $('openapiView').textContent = JSON.stringify(toOpenAPI(), null, 2); } catch (e) { $('openapiView').textContent = '生成失败：' + e.message; }
+  try { $('openapiView').textContent = JSON.stringify(toOpenAPI(), null, 2); reportOasLosses(); } catch (e) { $('openapiView').textContent = '生成失败：' + e.message; }
 }
 function renderProto() {
-  try { $('protoView').textContent = toProto(); } catch (e) { $('protoView').textContent = '生成失败：' + e.message; }
+  try { $('protoView').textContent = toProto(); reportProtoLosses(); } catch (e) { $('protoView').textContent = '生成失败：' + e.message; }
 }
 function sourceStatus(msg) {
   const el = $('sourceStatus'); el.textContent = msg;
@@ -1151,7 +1193,7 @@ function runRestCheck() { // 复制/导出 OpenAPI 时：以 REST 视角检查�
     if (!m.name) continue;
     const who = r.name + '.' + m.name;
     if (!String(m.desc || '').trim()) push('warn', '方法 ' + who + ' 缺描述：OpenAPI description 为空，AI/消费端读不到语义');
-    for (const f of m.input) if (f.name && !String(f.desc || '').trim()) push('warn', '字段 ' + who + '.' + f.name + ' 缺描述（schema description 缺失）');
+    for (const f of m.input) if (f.name && !(f.name === 'body' && f.type === 'ref') && !String(f.desc || '').trim()) push('warn', '字段 ' + who + '.' + f.name + ' 缺描述（schema description 缺失）');
     if (!String(m.http || '').trim() && (!m.stream || m.stream === 'none')) push('info', '方法 ' + who + ' 未显式配置 http：将按默认规则生成路由（可显式指定以明确 REST 语义）');
     if (m.stream && m.stream !== 'none' && !String(m.desc || '').trim() && !String(m.note || '').trim()) push('warn', '流式方法 ' + who + ' 未在 desc/note 说明消息结构（OpenAPI 无法强类型表达）');
     if (!m.errors || !m.errors.length) push('info', '方法 ' + who + ' 未定义错误码/状态码');
@@ -1167,8 +1209,8 @@ function runRpcCheck() { // 复制/导出 proto 时：以 RPC 视角检查语义
     if (!m.name) continue;
     const who = r.name + '.' + m.name;
     if (!String(m.desc || '').trim() && !String(m.note || '').trim()) push('warn', '方法 ' + who + ' 在 proto 无注释（desc/note 均为空）：RPC 唯一文档通道缺失');
-    for (const f of m.input) if (f.name && !String(f.desc || '').trim()) push('warn', '字段 ' + who + '.' + f.name + ' 无注释');
-    for (const f of m.input) if (f.name && !(f.tag > 0)) push('info', '字段 ' + who + '.' + f.name + ' 未显式编号（tag）');
+    for (const f of m.input) if (f.name && !(f.name === 'body' && f.type === 'ref') && !String(f.desc || '').trim()) push('warn', '字段 ' + who + '.' + f.name + ' 无注释');
+    for (const f of m.input) if (f.name && !(f.name === 'body' && f.type === 'ref') && !(f.tag > 0)) push('info', '字段 ' + who + '.' + f.name + ' 未显式编号（tag）');
     if (m.stream && m.stream !== 'none' && !String(m.desc || '').trim() && !String(m.note || '').trim()) push('warn', '流式方法 ' + who + ' 未在 desc/note 说明消息结构');
   }
   for (const m of project.models) {
@@ -1203,7 +1245,7 @@ function copyWithCheck(perspective, doCopy) {
 }
 function renderLog() {
   const el = $('logView'); if (!el) return;
-  if (!logs || !logs.length) { el.innerHTML = '<div class="placeholder">暂无日志。导入 OpenAPI 产生的错误报告与丢失记录会显示在这里。</div>'; return; }
+  if (!logs || !logs.length) { el.innerHTML = '<div class="placeholder">暂无日志。导入 OpenAPI / Proto 产生的错误报告与丢失记录会显示在这里。</div>'; return; }
   const badge = { info: '导入', warn: '丢失', error: '错误' };
   el.innerHTML = logs.map((e) => {
     const time = new Date(e.ts).toLocaleTimeString('zh-CN', { hour12: false });
@@ -1245,6 +1287,36 @@ function doImport() {
     runSemanticCheck(); // 导入后按 priority 视角体检
   } catch (e) {
     $('impWarn').innerHTML = '<div class="imp-warn-title">导入失败：</div><ul><li>' + esc(e.message) + '</li></ul>';
+    addLog('error', '导入失败', [e.message]);
+  }
+}
+
+// ---------- 导入 Proto（gRPC 契约反解续写） ----------
+function openImportProto() {
+  $('protoText').value = '';
+  $('protoWarn').innerHTML = '';
+  $('protoModal').hidden = false;
+  $('protoText').focus();
+}
+function closeImportProto() { $('protoModal').hidden = true; }
+function doImportProto() {
+  const text = $('protoText').value;
+  try {
+    const res = window.parseProtoText(text);
+    const p = res.project;
+    if (!p.imports) p.imports = [];
+    project = p;
+    sel = { kind: null, id: null };
+    refreshDerived();
+    renderTree();
+    renderForm();
+    showImpWarn(res.warnings);
+    saveStatus('已导入 ' + p.resources.length + ' 资源 / ' + p.models.length + ' 模型');
+    addLog('info', '导入成功：' + (p.name || '') + ' v' + (p.version || ''), ['资源 ' + p.resources.length + ' · 模型 ' + p.models.length + ' · 方法 ' + p.resources.reduce((a, r) => a + r.methods.length, 0)]);
+    if (res.warnings && res.warnings.length) addLog('warn', '导入丢失记录（' + res.warnings.length + ' 条）', res.warnings);
+    runSemanticCheck(); // 导入后按 priority 视角体检
+  } catch (e) {
+    $('protoWarn').innerHTML = '<div class="imp-warn-title">导入失败：</div><ul><li>' + esc(e.message) + '</li></ul>';
     addLog('error', '导入失败', [e.message]);
   }
 }
@@ -1351,6 +1423,17 @@ async function init() {
     if (!file) return;
     const r = new FileReader();
     r.onload = () => { $('impText').value = String(r.result || ''); $('impWarn').innerHTML = ''; };
+    r.readAsText(file);
+  };
+  $('protoImportBtn').onclick = openImportProto;
+  $('protoClose').onclick = closeImportProto;
+  $('protoConfirm').onclick = () => { if (confirm('导入会覆盖当前项目（未保存的改动将丢失），确认？')) { doImportProto(); closeImportProto(); } };
+  $('protoFile').onclick = () => $('protoFileInput').click();
+  $('protoFileInput').onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = () => { $('protoText').value = String(r.result || ''); $('protoWarn').innerHTML = ''; };
     r.readAsText(file);
   };
   $('filter').oninput = renderTree;

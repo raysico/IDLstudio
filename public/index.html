@@ -24,6 +24,7 @@
     <button id="importIdlBtn" class="btn" title="导入私有 DIDL 项目文件（.didl / .yaml / .json）还原项目">导入dIDL</button>
     <input type="file" id="importIdlInput" accept=".didl,.yaml,.yml,.json" hidden>
     <button id="importBtn" class="btn" title="导入 OpenAPI yaml/json 续写">导入OpenAPI</button>
+    <button id="protoImportBtn" class="btn" title="导入 proto3（gRPC 契约）反解续写">导入Proto</button>
     <button id="topExportBtn" class="btn primary" title="导出项目全部 IDL + 备注到文件（.didl）">导出项目<span class="keyhint" id="expKh"></span></button>
     <button id="loadBtn" class="btn" title="从本地 project.json 载入">载入<span class="keyhint" id="loadKh"></span></button>
   </div>
@@ -136,8 +137,28 @@
   </div>
 </div>
 
+<!-- 导入 Proto 弹窗 -->
+<div id="protoModal" class="modal-overlay" hidden>
+  <div class="modal">
+    <div class="modal-head"><span class="ftitle">导入 proto3（gRPC 契约反解续写）</span><button id="protoClose" class="btn" title="关闭">×</button></div>
+    <div class="modal-body">
+      <textarea id="protoText" class="code" rows="12" placeholder="粘贴 proto3 源码；或选择文件导入"></textarea>
+      <div class="row wrap" style="margin-top:8px">
+        <button class="btn" id="protoFile">选择文件…</button>
+        <span class="hist-hint">支持 .proto；导入会覆盖当前项目（可先保存）</span>
+      </div>
+      <input type="file" id="protoFileInput" accept=".proto,.txt" hidden>
+      <div id="protoWarn" class="imp-warn"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn primary" id="protoConfirm">导入（覆盖当前项目）</button>
+    </div>
+  </div>
+</div>
+
 <script src="/vendor/js-yaml.min.js"></script>
 <script src="/importer.js"></script>
+<script src="/protoImporter.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

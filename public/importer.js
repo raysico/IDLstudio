@@ -225,6 +225,6 @@
     return { project: openApiToModel(obj, warnings), warnings };
   }
 
+  if (typeof module !== 'undefined' && module.exports) module.exports = { openApiToModel, parseOpenApiText };
   if (typeof window !== 'undefined') { window.openApiToModel = openApiToModel; window.parseOpenApiText = parseOpenApiText; }
-  else { module.exports = { openApiToModel, parseOpenApiText }; }
 })();

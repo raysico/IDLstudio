@@ -9,7 +9,7 @@
 
 产物AI友好,方便无基础用户设计完毕直接交付给AI进行编程减少沟通成本;
 
-支持导入 OpenAPI 3.x 反解续写，以及导出 / 导入 `.didl` 跨设备还原继续编辑。
+支持导入 OpenAPI 3.x 与 proto3 反解续写，以及导出 / 导入 `.didl` 跨设备还原继续编辑。
 
 轻量、零构建、纯浏览器交互（仅服务端做本地持久化）。自带浅色 / 暗夜双主题。
 
@@ -44,7 +44,12 @@
 
 **导入续写**
 - **导入 OpenAPI**：粘贴或选文件导入 OpenAPI 3.x（yaml / json），反解回 IDL 表单继续编辑
+- **导入 Proto**：粘贴或选文件导入 proto3（gRPC 契约），反解回 IDL 表单继续编辑；service→资源、rpc→方法（含流式）、message→模型、enum→枚举、oneof/map/reserved/tag 完整还原
 - **导出项目 / 导入 DIDL**：把全部 IDL + 备注打包为 `.didl` 导出，跨设备 / 环境导入还原继续编辑
+
+**真源无损（1.2.2）**
+- **导入源 = 无损锚点**：proto 导入则以 proto 视角无损（具名消息名、流式形状原样还原），转 OpenAPI 的损点进日志；OpenAPI 导入则以 OpenAPI 视角无损，转 proto 的 REST 专有项（query/path 参数、路由、状态码）进日志；dIDL 导入双向无损
+- **合成 body 字段豁免体检**：方法指向具名消息的 `body` 引用不再被误报「未编号 / 无注释 / 缺描述」，真正的信息在其指向的模型里
 
 **proto 无损属性**
 - `tag` 字段编号（自动避让 `reserved` 紧凑补号）、`imports` 项目级依赖、`reserved` 编号 / 名称区间
@@ -92,7 +97,7 @@ docker run -d --name idlstudio -p 8010:8010 \
 
 1. 左侧树选中 **资源 / 方法 / 模型**，中间表单编辑；
 2. 右侧五个标签页实时查看 **IDL 源码 / OpenAPI / proto / 调试台 / 日志**；
-3. 顶部可 **导入OpenAPI** 续写、「**导入dIDL / 导出项目**」跨设备迁移、「**新建项目**」一键清空；
+3. 顶部可 **导入OpenAPI / 导入Proto** 续写、「**导入dIDL / 导出项目**」跨设备迁移、「**新建项目**」一键清空；
 4. 顶部「保存」或 `Ctrl/Cmd+S` 持久化到 `project.json`。
 
 IDL 语法与 OpenAPI / proto 的完整映射规则见 **[DESIGN.md](DESIGN.md)**。
@@ -117,7 +122,8 @@ IDLstudio/
     ├── index.html
     ├── style.css      # 浅/暗双主题
     ├── app.js         # IDL 模型、表单、双向同步、双生成器、语义检查、调试台、查找、快捷键
-    └── importer.js    # OpenAPI 3.x → IDL 导入器
+    ├── importer.js    # OpenAPI 3.x → IDL 导入器
+    └── protoImporter.js  # proto3 → IDL 导入器（反向 gRPC 契约）
 ```
 
 ## 工作原理

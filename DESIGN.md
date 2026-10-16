@@ -168,19 +168,24 @@ IDLstudio/
 | `reserved: { numbers, names }` | 模型 | 发射 `reserved 2,15,9 to 11;` / `reserved "a","b";` |
 | `options: { key: value }` | 项目/消息/字段/方法 | 兜底袋，导出原样回写 |
 
-### 9.4 方向性说明
-- **proto 方向**：完全无损（含 9.3 全部属性）。
-- **OpenAPI 方向**：wire 编号、reserved、部分 option 无法表达 → IDL 保留、OpenAPI 输出忽略；oneof→`oneOf`、stream→`x-streaming`。
+### 9.4 方向性说明（真源无损）
+**导入源 = 无损锚点，他端报损**（1.2.2 起）：
+- **proto 为真源**：具名请求/响应消息一律保留为模型 + `body:ref` / `output:ref`（不内联、不合成包装），再生成 proto 时原样透传模型名与流式形状 → **proto 视角无损**；转 OpenAPI 的损点（流式无法以 REST 无损表达）记入日志并留 `x-streaming`。
+- **OpenAPI 为真源**：共享 body 直接 `$ref`（不包 `body` 层）→ **OpenAPI 视角无损**；转 proto 的 REST 专有项（query/path 参数、自定义路由、状态码）记入日志，proto 尾部附「损点说明」注释。
+- **dIDL 为真源**：既有 both 数据，双向均无损。
+- wire 编号、reserved、部分 option 属 proto 特性，OpenAPI 输出忽略（非本方向损点）。
 
 ### 9.5 表单与实现落点
 - 每个模型/方法/字段增加「**高级(proto)属性**」可折叠区，默认收起。
-- 已实现 `public/importer.js`（OpenAPI 3.x → IDL：`openApiToModel` / `parseIdlYaml`）；`app.js` 接入导入流程与名称冲突处理；`index.html` 加入口；`server.js` 不动。`protoToModel`（proto 反向导入）尚未实现（见 ROADMAP）。
-- **无损验收标准**：导入 proto → 导出 → 再导入 → **逐字节一致**（golden round-trip）。
+- 已实现 `public/importer.js`（OpenAPI 3.x → IDL）、`public/protoImporter.js`（proto3 → IDL：`parseProtoText` / `protoToModel`，手写 proto3 子集 Lexer+Parser，零新依赖）；`app.js` 接入两种导入流程与语义检查；`toProto` 对单 `body:ref` 直接透传模型名；`toOpenAPI` 对单个具名 body 直接 `$ref` 并报流式损点。
+- **无损验收标准**：导入 proto → 导出 → 再导入 → **逐字节一致**（golden round-trip），`test/` 曾含 `fidelity-test.js` 三方向验证（发布时已随测试目录移除）。
 
 ### 9.6 分期
 1. **阶段一**（✅ 已实施）：OpenAPI yaml/json 导入续写 + 无损属性 `tag`（字段编号）+ `imports`（项目）+ `reserved`（模型，编号/名称）
 2. **阶段二**（✅ 已实施）：`oneof`（互斥字段组：字段行 oneof 组名 → proto `oneof 块` / OpenAPI `oneOf`）+ `stream`（方法级 none/server/client/bidi → proto `stream Xxx` / OpenAPI `x-streaming`；导入反向映射：`x-streaming`→stream、schema `oneOf`→合成 oneof 模型）
 3. **阶段三**（✅ 已实施）：`options` 兜底袋（项目/消息/字段/方法四层 JSON 录入；proto 原样回写：文件级 `option`、message 级 `option`、字段 `[ k = v ]`、method `{ option }`；OpenAPI 按方向性忽略）
+4. **阶段四**（✅ 已实施，1.2.2）：**proto 反向导入 + 真源无损**——service→资源（去 `Service` 后缀，生成时补回）、rpc→方法（含 4 种流式）、message→模型（map/repeated/oneof/reserved/tag 完整还原）、enum→IDL 枚举（回剔 `_UNSPECIFIED` 哨兵）、注释归位 desc/note、类型归一（`int32→int` 等）进丢失记录；具名请求/响应保留为模型，`toProto` body:ref 直接透传；`toOpenAPI` 流式报损、单具名 body 直接 `$ref`；合成 `body` 字段豁免体检
+5. **阶段五**（✅ 已实施，1.2.2）：**往返无损验证**——proto→DIDL→proto 无损（名字+流式形状）、OpenAPI→DIDL→OpenAPI 无损 + 转 proto 报损、dIDL 双向稳定（验证脚本随测试目录移除）
 
 ## 10. 验收
 - 通过表单或源码新增/修改一个资源与字段 → OpenAPI 与 proto 实时变化

@@ -39,19 +39,27 @@
 
 ### 阶段五：proto 反向导入（.proto → DIDL → 续写）
 **目标**：闭环 RPC 侧，补上当前完全空窗的一侧。
-- `.proto` 解析：`message / enum / oneof / stream / options / imports / reserved / 字段编号`
-- 反向映射到 DIDL 表单（含「一 Service → 资源」的映射规则）
-- 有损点写入 warnings（日志标签页）
+- ~~`.proto` 解析：`message / enum / oneof / stream / options / imports / reserved / 字段编号`~~ ✅ 已实施
+- ~~反向映射到 DIDL 表单（含「一 Service → 资源」的映射规则）~~ ✅ 已实施
+- ~~有损点写入 warnings（日志标签页）~~ ✅ 已实施
 
 **验收**：导入典型 gRPC `.proto` 可还原继续编辑。
 
+**状态：✅ 已实施（1.2.2）**
+- `public/protoImporter.js` 手写 proto3 子集 Lexer+Parser（零新依赖）：`service→资源`（去 `Service` 后缀，生成时补回）、`rpc→方法`（含 4 种流式 none/server/client/bidi）、`message→模型`（map/repeated/oneof/reserved/tag 完整还原）、`enum→IDL 枚举`（回剔 `_UNSPECIFIED` 哨兵）、注释归位 `desc/note`、类型归一（`int32→int` 等）进丢失记录、`import google/protobuf/*` 过滤、`package→项目名`（另存 `options._proto_package` 保证往返）。
+- **真源无损**：具名请求/响应消息一律保留为模型 + `body:ref` / `output:ref`（不内联、不合成包装）；`toProto` 对单 `body:ref` 直接透传模型名 → 再生成 proto 无损（名字 + 流式形状）。
+
 ### 阶段六：往返无损测试
 **目标**：把「丢了什么」从感觉变成**可量化、可回归**。
-- 建立「DIDL → OpenAPI/proto → 再导入 DIDL」的往返测试用例集
-- 每条有损点给出可度量指标（字段丢失数、语义丢失类型）
-- 接入 CI（`.github/workflows/check.yml`）自动跑往返测试
+- ~~建立「DIDL → OpenAPI/proto → 再导入 DIDL」的往返测试用例集~~ ✅ 已实施
+- ~~每条有损点给出可度量指标（字段丢失数、语义丢失类型）~~ ✅ 已实施
+- 接入 CI（`.github/workflows/check.yml`）自动跑往返测试 —— ⚠️ 未接入（测试目录随 1.2.2 发布移除，见下）
 
 **验收**：有损点清单有量化基线，后续改动可回归验证。
+
+**状态：✅ 已实施（1.2.2）**
+- 三方向验证：proto→DIDL→proto **无损**（名字 + 流式形状）；OpenAPI→DIDL→OpenAPI **无损**（共享 body 直接 `$ref`）+ 转 proto 报 REST 损点；dIDL 双向稳定。
+- 说明：验证脚本曾置于 `test/`（`fidelity-test.js` 等），随 1.2.2 发布**整体移除**（用户决定发布不含测试目录）；如需回归需重建或接 CI。
 
 ### 阶段七：DIDL 格式稳定化
 **目标**：私有格式进入受管状态，跨版本可迁移。
@@ -71,14 +79,14 @@
 ## 三、依赖关系
 
 ```
-阶段四（扩子集） ──► 阶段六（往返测试）
-阶段五（proto 导入） ──► 阶段六（往返测试）
+阶段四（扩子集） ──► 阶段六（往返测试）✅
+阶段五（proto 导入） ──► 阶段六（往返测试）✅ 五、六 已于 1.2.2 完成
 阶段七（格式稳定化） 依赖 阶段四/五 的字段稳定
 阶段八 独立，可随时并行
 ```
 
 ## 四、优先级建议
-1. **阶段六（往返测试）先建立基线**：没有量化基线，前几阶段的"更无损"无法验证。
-2. 再走 **阶段四（扩子集）**：成本低、直接减少最常触发的损失。
-3. **阶段五（proto 导入）** 价值高、工作量中，补齐 RPC 闭环。
+1. ✅ **阶段六（往返测试）**：1.2.2 已建立三方向无损基线（proto/OpenAPI/dIDL），验证脚本随发布移除，CI 未接入。
+2. ✅ **阶段五（proto 导入）**：1.2.2 已闭环 RPC 侧并实现真源无损。
+3. **阶段四（扩子集）**：成本低、直接减少最常触发的损失（可空 / 字节 / 定长类型）。
 4. **阶段七（格式稳定化）** 在有新字段后做，避免早期频繁迁移。
